@@ -6,12 +6,6 @@
 Farm::Farm(int numOfWorkers, WorkerFunction workerFunction)
     : numOfWorkers(numOfWorkers), workerFunction(workerFunction) {
     workers.resize(numOfWorkers);
-    //creatte worker threads
-    for (int i = 0; i < numOfWorkers; ++i) {
-        pthread_t thread;
-        pthread_create(&thread, nullptr, workerFunction, &workers[i]); //passes the worker[i] as an argument to the workerFunction
-        threads.push_back(thread);
-    }
 }
 
 Farm::~Farm() {
@@ -23,11 +17,38 @@ Farm::~Farm() {
     }
 }
 
-void Farm::submitTask(int workerId, Task task) {
-    //add task to specific worker's input queue
-    pthread_mutex_lock(&workers[workerId].inputMutex);
-    workers[workerId].inputQueue.push(task);
-    pthread_mutex_unlock(&workers[workerId].inputMutex);
+void Farm::processTasks(const std::vector<Task>& tasks) {
+    
+    //preparing tasks
+    distributeTasks(tasks);
+    signalEOS(); //also enqueue end of stream tasks
+
+    //create worker threads
+    for (int i = 0; i < numOfWorkers; ++i) {
+        pthread_t thread;
+        pthread_create(&thread, nullptr, workerFunction, &workers[i]); //passes the worker[i] as an argument to the workerFunction
+        threads.push_back(thread);
+    }
+
+    joinThreads();
+
+    //collection of results
+}
+
+
+//uses round-robin
+void Farm::distributeTasks(const std::vector<Task>& tasks) {
+    size_t currentWorker = 0;
+
+    for (const Task& task : tasks) {
+        //lock mutex for current worker's queue
+        pthread_mutex_lock(&workers[currentWorker].inputMutex);
+        workers[currentWorker].inputQueue.push(task);
+        pthread_mutex_unlock(&workers[currentWorker].inputMutex);
+
+        //move to next worker
+        currentWorker = (currentWorker + 1) % numOfWorkers;
+    }
 }
 
 // Add a task to the output queue for a specific worker
@@ -56,25 +77,28 @@ bool Farm::dequeueResult(int workerId, Result& result) {
 //Instead of making an EOS flag directly to the worker, creating an EOS task instead allows tasks to finish
 //without abruptly shutting down and extra synchronisation
 void Farm::signalEOS() {
+    std::vector<Task> eosTasks;
     //EOS task
     Task eosTask;
     eosTask.isEOS = true;
     for(int i = 0; i < numOfWorkers; ++i) {
-        submitTask(i, eosTask);
+        eosTasks.push_back(eosTask);
+    }
+    distributeTasks(eosTasks);
+}
+
+void Farm::joinThreads() {
+    //join all worker threads to ensure they've finished
+    for (auto& thread : threads) {
+        pthread_join(thread, nullptr);
     }
 }
 
 //method to manually stop all workers (handles thread clean up)
 void Farm::stopWorkers() {
-
     
     //signal all worker threads to stop manually
-    // for (Worker& worker : workers) {
-    //     worker.stopRequested = true;
-    // }
-
-    //join all worker threads to ensure they've finished
-    for (auto& thread : threads) {
-        pthread_join(thread, nullptr);
+    for (Worker& worker : workers) {
+        worker.stopRequested = true;
     }
 }

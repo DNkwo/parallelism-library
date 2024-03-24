@@ -68,34 +68,40 @@ Result increment(void* arg) {
 
 
 int main() {
-    int numOfWorkers = 4;
-    Farm farm(numOfWorkers, workerWrapper);
-    
+
     int lol = 0;
-    //submit tasks to specific workers
-    for(int i = 0; i < numOfWorkers; ++i) {
+    //Preperation of tasks
+    std::vector<Task> tasks;
+    for(int i = 0; i < 10; ++i) {
         Task task(increment, &lol);
-        farm.submitTask(i, task);
+        tasks.push_back(task);
     }
 
-    // sleep(2);
+    Farm farm(4, workerWrapper);
+    farm.processTasks(tasks);
+    
+    // //submit tasks to specific workers
+    // for(int i = 0; i < numOfWorkers; ++i) {
+    //     Task task(increment, &lol);
+    //     farm.submitTask(i, task);
+    // }
 
-    farm.signalEOS(); //sends EOS task to all workers to halt processing 
-    farm.stopWorkers();
+
+    // farm.signalEOS(); //sends EOS task to all workers to halt processing 
 
     //collect the results from each worker's output queue
-    std::vector<Result> allResults;
-    for (int i = 0; i < numOfWorkers; ++i) {
-        Result result;
-        while (farm.dequeueResult(i, result)) {
-            allResults.push_back(result);
-        }
-    }
+    // std::vector<Result> allResults;
+    // for (int i = 0; i < numOfWorkers; ++i) {
+    //     Result result;
+    //     while (farm.dequeueResult(i, result)) {
+    //         allResults.push_back(result);
+    //     }
+    // }
 
-    for (const auto& res : allResults) {
-        int* result = static_cast<int*>(res.data);
-        std::cout << "Result: " << *result << std::endl;
-    }
+    // for (const auto& res : allResults) {
+    //     int* result = static_cast<int*>(res.data);
+    //     std::cout << "Result: " << *result << std::endl;
+    // }
 
     std::cout << "hello" << std::endl;
 

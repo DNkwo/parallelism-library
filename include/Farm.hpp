@@ -65,15 +65,18 @@ private:
 
 public:
     Farm(int numOfWorkers, WorkerFunction workerFunction);
-
     ~Farm(); //destructor
 
-    void submitTask(int workerId, Task task);
+    void processTasks(const std::vector<Task>& tasks);
+
+    void distributeTasks(const std::vector<Task>& tasks);
 
     //adding and removing tasks from outqueue, using these methods ensure thread-safe ways of modifying the outputqueue
     void enqueueResult(int workerId, const Result& result);
 
     bool dequeueResult(int workerId, Result& result);
+
+    void joinThreads();
 
     void signalEOS();
 
