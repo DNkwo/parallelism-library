@@ -1,8 +1,7 @@
 #ifndef FARM_HPP
 #define FARM_HPP
 
-
-#include "ParallelPattern.hpp"
+#include "ParaPat.hpp"
 
 #include <iostream>
 #include <pthread.h>
@@ -13,15 +12,24 @@
 //define worker function type
 typedef void* (*WorkerFunction)(void*);
 
-struct Task {
-    int value = 0;
-    bool isValid = false; //by default
-    bool isEOS = false;
+struct Result {
+    void* data;
 };
 
-struct Result {
-    int value;
+typedef Result (*TaskFunction)(void*);
+
+struct Task {
+    TaskFunction function;
+    void* arg;
+    bool isValid = true; //by default
+    bool isEOS = false;
+
+    //constructors
+    Task() : function(nullptr), arg(nullptr), isEOS(false), isValid(false) {} //default constructor
+    Task(TaskFunction func, void* argument, bool endOfStream = false) 
+    : function(func), arg(argument), isValid(true), isEOS(endOfStream) {}
 };
+
 
 class Worker {
 public:
@@ -32,7 +40,7 @@ public:
     pthread_mutex_t outputMutex;
 
     // we use this flag to singal worker to stop (the thread, regardless of state of task queue)
-    volatile bool stopRequested; // (volatile ensures threads do not miss updates from main thread)
+    volatile bool stopRequested = false; // (volatile ensures threads do not miss updates from main thread)
 
     Worker() : stopRequested(false) {
         //initialise the mutexes
@@ -47,7 +55,7 @@ public:
     }
 };
 
-class Farm : public ParallelPattern {
+class Farm : public ParaPat {
 private:
     size_t numOfWorkers;
     std::vector<pthread_t> threads;

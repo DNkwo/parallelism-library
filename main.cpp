@@ -1,40 +1,5 @@
 #include "include/Farm.hpp"
 
-//worker function, executed by each thread
-// void* workerFunction(void* arg) {
-//     Worker* worker = static_cast<Worker*>(arg);
-
-//     while (!worker->stopRequested) {
-//         Task task;
-//         bool hasTask = false;
-
-//         //attempt to get a task from the input queue
-//         pthread_mutex_lock(&worker->inputMutex);
-//         if (!worker->inputQueue.empty()) {
-//             task = worker->inputQueue.front();
-//             worker->inputQueue.pop();
-//             hasTask = true;
-//         }
-//         pthread_mutex_unlock(&worker->inputMutex);
-
-//         if (hasTask) {
-//             // Process the task
-//             Result result;
-//             result.value = task.value + 1;
-//             pthread_mutex_lock(&worker->outputMutex);
-//             worker->outputQueue.push(result);
-//             pthread_mutex_unlock(&worker->outputMutex);
-//         } else if (worker->stopRequested) {
-//             //exit loop if no task found and stopping is requested
-//             break;
-//         } else {
-//             sched_yield(); //yield the processor, to reduce busy-waiting overhead
-//         }
-//     }
-
-//     return nullptr;
-// }
-
 
 Task gettask(std::queue<Task>& inputQueue, pthread_mutex_t& inputMutex) {
     //attempt to get a task from the input queue
@@ -49,11 +14,11 @@ Task gettask(std::queue<Task>& inputQueue, pthread_mutex_t& inputMutex) {
     return task; //return task that is not valid
 }
 
-Result doWork(const Task& task) {
-    Result result;
-    result.value = task.value + 1;
-    return result;
-}
+// Result doWork(const Task& task) {
+//     Result result;
+//     result.result = task.function(task.arg);
+//     return result;
+// }
 
 void puttask(std::queue<Result>& outputQueue, pthread_mutex_t& outputMutex, const Result& result) {
     pthread_mutex_lock(&outputMutex);
@@ -61,8 +26,11 @@ void puttask(std::queue<Result>& outputQueue, pthread_mutex_t& outputMutex, cons
     pthread_mutex_unlock(&outputMutex);
 }
 
+
+//The worker wrapper abstracts the queuing logic, ensuring thread-safety and allowing us to focus on processing tasks
 void* workerWrapper(void* arg) {
-    Worker* worker = static_cast<Worker*>(arg);
+    Worker* worker = static_cast<Worker*>(arg); //passes through a pointer to the worker instnace
+
 
     while (!worker->stopRequested) { //manual stopping method
         Task task = gettask(worker->inputQueue, worker->inputMutex);
@@ -72,7 +40,7 @@ void* workerWrapper(void* arg) {
         }
 
         if(task.isValid) {
-            Result result = doWork(task);
+            Result result = task.function(task.arg);
             puttask(worker->outputQueue, worker->outputMutex, result);
             task.isValid = false; //now that task has been completed, we invalidate it,
         } else {
@@ -85,19 +53,34 @@ void* workerWrapper(void* arg) {
 }
 
 
+Result increment(void* arg) {
+    int* pValue = static_cast<int*>(arg);
+
+    Result res;
+    if (pValue) {
+        ++(*pValue);
+    }
+    
+    res.data = pValue;
+    return res;
+}
+
+
 
 int main() {
-    int numOfWorkers = 2;
+    int numOfWorkers = 4;
     Farm farm(numOfWorkers, workerWrapper);
     
+    int lol = 0;
     //submit tasks to specific workers
     for(int i = 0; i < numOfWorkers; ++i) {
-        Task task;
+        Task task(increment, &lol);
         farm.submitTask(i, task);
     }
 
-    farm.signalEOS(); //sends EOS task to all workers to halt processing 
+    // sleep(2);
 
+    farm.signalEOS(); //sends EOS task to all workers to halt processing 
     farm.stopWorkers();
 
     //collect the results from each worker's output queue
@@ -110,8 +93,11 @@ int main() {
     }
 
     for (const auto& res : allResults) {
-        std::cout << "Result: " << res.value << std::endl;
+        int* result = static_cast<int*>(res.data);
+        std::cout << "Result: " << *result << std::endl;
     }
+
+    std::cout << "hello" << std::endl;
 
 
 

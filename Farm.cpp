@@ -9,7 +9,7 @@ Farm::Farm(int numOfWorkers, WorkerFunction workerFunction)
     //creatte worker threads
     for (int i = 0; i < numOfWorkers; ++i) {
         pthread_t thread;
-        pthread_create(&thread, nullptr, workerFunction, &workers[i]);
+        pthread_create(&thread, nullptr, workerFunction, &workers[i]); //passes the worker[i] as an argument to the workerFunction
         threads.push_back(thread);
     }
 }
@@ -53,6 +53,8 @@ bool Farm::dequeueResult(int workerId, Result& result) {
 
 }
 
+//Instead of making an EOS flag directly to the worker, creating an EOS task instead allows tasks to finish
+//without abruptly shutting down and extra synchronisation
 void Farm::signalEOS() {
     //EOS task
     Task eosTask;
