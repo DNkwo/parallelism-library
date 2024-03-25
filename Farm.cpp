@@ -6,6 +6,13 @@
 Farm::Farm(int numOfWorkers, WorkerFunction workerFunction)
     : numOfWorkers(numOfWorkers), workerFunction(workerFunction) {
     workers.resize(numOfWorkers);
+
+    //assign id and the worker function to each worker
+    for (int i = 0; i < numOfWorkers; ++i) {
+        workers[i].id = i + 1;
+        workers[i].workerFunction = workerFunction;
+    }
+
 }
 
 Farm::~Farm() {
@@ -17,8 +24,55 @@ Farm::~Farm() {
     }
 }
 
-void Farm::processTasks(const std::vector<Task>& tasks) {
-    
+Task gettask(std::queue<Task>& inputQueue, pthread_mutex_t& inputMutex) {
+    //attempt to get a task from the input queue
+    pthread_mutex_lock(&inputMutex);
+    Task task;
+    if (!inputQueue.empty()) {
+        task = inputQueue.front();
+        inputQueue.pop();
+        task.isValid = true; //mark as valid task
+    }
+    pthread_mutex_unlock(&inputMutex);
+    return task; //return task that is not valid
+}
+
+
+void puttask(std::queue<Result>& outputQueue, pthread_mutex_t& outputMutex, const Result& result) {
+    pthread_mutex_lock(&outputMutex);
+    outputQueue.push(result);
+    pthread_mutex_unlock(&outputMutex);
+}
+
+//The worker wrapper abstracts the queuing logic, ensuring thread-safety and allowing us to focus on processing tasks
+void* workerWrapper(void* arg) {
+    Worker* worker = static_cast<Worker*>(arg); //passes through a pointer to the worker instnace
+
+    while (!worker->stopRequested) { //manual stopping method
+        Task task = gettask(worker->inputQueue, worker->inputMutex);
+
+        if (task.isEOS) {//if this is the terminating task
+            break;
+        }
+
+        if(task.isValid) {
+            Result result;
+            void* output = worker->workerFunction(task.data);
+            result.data = output;
+            puttask(worker->outputQueue, worker->outputMutex, result);
+            task.isValid = false; //now that task has been completed, we invalidate it,
+        } else {
+            sched_yield(); //yield if no task was fetched, allows to reduce busy waiting
+        }
+
+    }
+
+    return nullptr;
+
+}
+
+
+Result Farm::addTasksAndProcess(const std::vector<Task>& tasks) {
     //preparing tasks
     distributeTasks(tasks);
     signalEOS(); //also enqueue end of stream tasks
@@ -26,13 +80,15 @@ void Farm::processTasks(const std::vector<Task>& tasks) {
     //create worker threads
     for (int i = 0; i < numOfWorkers; ++i) {
         pthread_t thread;
-        pthread_create(&thread, nullptr, workerFunction, &workers[i]); //passes the worker[i] as an argument to the workerFunction
+        pthread_create(&thread, nullptr, workerWrapper, &workers[i]); //passes the worker[i] as an argument to the workerFunction
         threads.push_back(thread);
     }
-
     joinThreads();
 
+    Result res;
+
     //collection of results
+    return res;
 }
 
 
@@ -45,7 +101,6 @@ void Farm::distributeTasks(const std::vector<Task>& tasks) {
         pthread_mutex_lock(&workers[currentWorker].inputMutex);
         workers[currentWorker].inputQueue.push(task);
         pthread_mutex_unlock(&workers[currentWorker].inputMutex);
-
         //move to next worker
         currentWorker = (currentWorker + 1) % numOfWorkers;
     }
@@ -79,8 +134,7 @@ bool Farm::dequeueResult(int workerId, Result& result) {
 void Farm::signalEOS() {
     std::vector<Task> eosTasks;
     //EOS task
-    Task eosTask;
-    eosTask.isEOS = true;
+    Task eosTask(nullptr, true);
     for(int i = 0; i < numOfWorkers; ++i) {
         eosTasks.push_back(eosTask);
     }
@@ -96,9 +150,13 @@ void Farm::joinThreads() {
 
 //method to manually stop all workers (handles thread clean up)
 void Farm::stopWorkers() {
-    
     //signal all worker threads to stop manually
     for (Worker& worker : workers) {
         worker.stopRequested = true;
     }
 }
+
+
+
+
+

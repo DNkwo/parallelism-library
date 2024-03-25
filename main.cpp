@@ -1,59 +1,7 @@
 #include "include/Farm.hpp"
 
 
-Task gettask(std::queue<Task>& inputQueue, pthread_mutex_t& inputMutex) {
-    //attempt to get a task from the input queue
-    pthread_mutex_lock(&inputMutex);
-    Task task;
-    if (!inputQueue.empty()) {
-        task = inputQueue.front();
-        inputQueue.pop();
-        task.isValid = true; //mark as valid task
-    }
-    pthread_mutex_unlock(&inputMutex);
-    return task; //return task that is not valid
-}
-
-// Result doWork(const Task& task) {
-//     Result result;
-//     result.result = task.function(task.arg);
-//     return result;
-// }
-
-void puttask(std::queue<Result>& outputQueue, pthread_mutex_t& outputMutex, const Result& result) {
-    pthread_mutex_lock(&outputMutex);
-    outputQueue.push(result);
-    pthread_mutex_unlock(&outputMutex);
-}
-
-
-//The worker wrapper abstracts the queuing logic, ensuring thread-safety and allowing us to focus on processing tasks
-void* workerWrapper(void* arg) {
-    Worker* worker = static_cast<Worker*>(arg); //passes through a pointer to the worker instnace
-
-
-    while (!worker->stopRequested) { //manual stopping method
-        Task task = gettask(worker->inputQueue, worker->inputMutex);
-
-        if (task.isEOS) {//if this is the terminating task
-            break;
-        }
-
-        if(task.isValid) {
-            Result result = task.function(task.arg);
-            puttask(worker->outputQueue, worker->outputMutex, result);
-            task.isValid = false; //now that task has been completed, we invalidate it,
-        } else {
-            sched_yield(); //yield if no task was fetched, allows to reduce busy waiting
-        }
-
-    }
-
-    return nullptr;
-}
-
-
-Result increment(void* arg) {
+void* increment(void* arg) {
     int* pValue = static_cast<int*>(arg);
 
     Result res;
@@ -62,7 +10,8 @@ Result increment(void* arg) {
     }
     
     res.data = pValue;
-    return res;
+
+    return nullptr;
 }
 
 
@@ -73,12 +22,12 @@ int main() {
     //Preperation of tasks
     std::vector<Task> tasks;
     for(int i = 0; i < 10; ++i) {
-        Task task(increment, &lol);
+        Task task(&lol);
         tasks.push_back(task);
     }
 
-    Farm farm(4, workerWrapper);
-    farm.processTasks(tasks);
+    Farm farm(4, increment);
+    farm.addTasksAndProcess(tasks);
     
     // //submit tasks to specific workers
     // for(int i = 0; i < numOfWorkers; ++i) {

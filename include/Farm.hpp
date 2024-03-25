@@ -9,35 +9,44 @@
 #include <unistd.h>
 #include <queue>
 
-//define worker function type
-typedef void* (*WorkerFunction)(void*);
 
 struct Result {
     void* data;
 };
 
-typedef Result (*TaskFunction)(void*);
+//define worker function type
+typedef void* (*WorkerFunction)(void*);
+
 
 struct Task {
-    TaskFunction function;
-    void* arg;
+    void* data = nullptr;
     bool isValid = true; //by default
     bool isEOS = false;
 
+
+    //default construct
+    Task() : data(nullptr), isValid(true), isEOS(false) {}
+
     //constructors
-    Task() : function(nullptr), arg(nullptr), isEOS(false), isValid(false) {} //default constructor
-    Task(TaskFunction func, void* argument, bool endOfStream = false) 
-    : function(func), arg(argument), isValid(true), isEOS(endOfStream) {}
+    Task(void* data) 
+    :  data(data), isValid(true), isEOS(false) {}
+
+
+    Task(void* data, bool isEOS) 
+    :  data(data), isValid(true), isEOS(isEOS) {}
 };
 
 
 class Worker {
 public:
+    size_t id = 0;
     std::queue<Task> inputQueue;
     pthread_mutex_t inputMutex;
 
     std::queue<Result> outputQueue;
     pthread_mutex_t outputMutex;
+
+    WorkerFunction workerFunction = nullptr;
 
     // we use this flag to singal worker to stop (the thread, regardless of state of task queue)
     volatile bool stopRequested = false; // (volatile ensures threads do not miss updates from main thread)
@@ -65,9 +74,10 @@ private:
 
 public:
     Farm(int numOfWorkers, WorkerFunction workerFunction);
+
     ~Farm(); //destructor
 
-    void processTasks(const std::vector<Task>& tasks);
+    Result addTasksAndProcess(const std::vector<Task>& tasks);
 
     void distributeTasks(const std::vector<Task>& tasks);
 
