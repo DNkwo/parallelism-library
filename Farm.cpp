@@ -2,9 +2,10 @@
 #include <iostream>
 #include <unistd.h>
 #include <queue>
+#include <vector>
 
 Farm::Farm(int numOfWorkers, WorkerFunction workerFunction)
-    : numOfWorkers(numOfWorkers), workerFunction(workerFunction) {
+    : Stage<Task, Result>(workerFunction), numOfWorkers(numOfWorkers) {
     workers.resize(numOfWorkers);
 
     //assign id and the worker function to each worker
@@ -16,7 +17,6 @@ Farm::Farm(int numOfWorkers, WorkerFunction workerFunction)
 }
 
 Farm::~Farm() {
-    stop = true;
     for (auto& t : threads) {
         if (t) {
             pthread_join(t, nullptr); //ensure all threads are joined
@@ -24,24 +24,16 @@ Farm::~Farm() {
     }
 }
 
-Task gettask(std::queue<Task>& inputQueue, pthread_mutex_t& inputMutex) {
+Task gettask(ThreadSafeQueue<Task>& inputQueue) {
     //attempt to get a task from the input queue
-    pthread_mutex_lock(&inputMutex);
     Task task;
-    if (!inputQueue.empty()) {
-        task = inputQueue.front();
-        inputQueue.pop();
-        task.isValid = true; //mark as valid task
-    }
-    pthread_mutex_unlock(&inputMutex);
-    return task; //return task that is not valid
+    task.isValid = inputQueue.dequeue(task); //stores task in 'task' and marks task as valid if successful return
+    return task; //return task
 }
 
 
-void puttask(std::queue<Result>& outputQueue, pthread_mutex_t& outputMutex, const Result& result) {
-    pthread_mutex_lock(&outputMutex);
-    outputQueue.push(result);
-    pthread_mutex_unlock(&outputMutex);
+void puttask(ThreadSafeQueue<Result>& outputQueue, const Result& result) {
+    outputQueue.enqueue(result);
 }
 
 //The worker wrapper abstracts the queuing logic, ensuring thread-safety and allowing us to focus on processing tasks
@@ -49,7 +41,7 @@ void* workerWrapper(void* arg) {
     Worker* worker = static_cast<Worker*>(arg); //passes through a pointer to the worker instnace
 
     while (!worker->stopRequested) { //manual stopping method
-        Task task = gettask(worker->inputQueue, worker->inputMutex);
+        Task task = gettask(worker->inputQueue);
 
         if (task.isEOS) {//if this is the terminating task
             break;
@@ -59,20 +51,18 @@ void* workerWrapper(void* arg) {
             Result result;
             void* output = worker->workerFunction(task.data);
             result.data = output;
-            puttask(worker->outputQueue, worker->outputMutex, result);
+            puttask(worker->outputQueue, result);
             task.isValid = false; //now that task has been completed, we invalidate it,
         } else {
             sched_yield(); //yield if no task was fetched, allows to reduce busy waiting
         }
 
     }
-
     return nullptr;
-
 }
 
 
-Result Farm::addTasksAndProcess(const std::vector<Task>& tasks) {
+ThreadSafeQueue<Result> Farm::process(ThreadSafeQueue<Task>& tasks) {
     //preparing tasks
     distributeTasks(tasks);
     signalEOS(); //also enqueue end of stream tasks
@@ -85,22 +75,26 @@ Result Farm::addTasksAndProcess(const std::vector<Task>& tasks) {
     }
     joinThreads();
 
-    Result res;
+    ThreadSafeQueue<Result> results;
 
-    //collection of results
-    return res;
+    //collection of results from each workers queue
+    for (int i = 0; i < numOfWorkers; ++i) {
+        Result result;
+        while(dequeueResult(i, result)) {
+            results.enqueue(result);
+        }
+    }
+    return results;
 }
 
 
 //uses round-robin
-void Farm::distributeTasks(const std::vector<Task>& tasks) {
-    size_t currentWorker = 0;
+void Farm::distributeTasks(ThreadSafeQueue<Task>& queue) {
 
-    for (const Task& task : tasks) {
-        //lock mutex for current worker's queue
-        pthread_mutex_lock(&workers[currentWorker].inputMutex);
-        workers[currentWorker].inputQueue.push(task);
-        pthread_mutex_unlock(&workers[currentWorker].inputMutex);
+    while (!queue.empty()) {
+        Task task;
+        queue.dequeue(task);
+        workers[currentWorker].inputQueue.enqueue(task);
         //move to next worker
         currentWorker = (currentWorker + 1) % numOfWorkers;
     }
@@ -108,35 +102,24 @@ void Farm::distributeTasks(const std::vector<Task>& tasks) {
 
 // Add a task to the output queue for a specific worker
 void Farm::enqueueResult(int workerId, const Result& result) {
-    pthread_mutex_lock(&workers[workerId].outputMutex);
     std::cout << "result has been pushed" << std::endl;
-    workers[workerId].outputQueue.push(result);
-    pthread_mutex_unlock(&workers[workerId].outputMutex);
+    workers[workerId].outputQueue.enqueue(result);
 }
 
 // Remove and retrieve a task from the output queue for a specific worker
 bool Farm::dequeueResult(int workerId, Result& result) {
-    pthread_mutex_lock(&workers[workerId].outputMutex);
-    if (!workers[workerId].outputQueue.empty()) {
-        result = workers[workerId].outputQueue.front();
-        workers[workerId].outputQueue.pop();
-        pthread_mutex_unlock(&workers[workerId].outputMutex);
-        return true;
-    } else {
-        pthread_mutex_unlock(&workers[workerId].outputMutex);
-        return false; //queue is empty and thereforre no result has been dequeued
-    }
+    return workers[workerId].outputQueue.dequeue(result);
 
 }
 
 //Instead of making an EOS flag directly to the worker, creating an EOS task instead allows tasks to finish
 //without abruptly shutting down and extra synchronisation
 void Farm::signalEOS() {
-    std::vector<Task> eosTasks;
+    ThreadSafeQueue<Task> eosTasks;
     //EOS task
     Task eosTask(nullptr, true);
     for(int i = 0; i < numOfWorkers; ++i) {
-        eosTasks.push_back(eosTask);
+        eosTasks.enqueue(eosTask);
     }
     distributeTasks(eosTasks);
 }

@@ -1,60 +1,56 @@
 #include "include/Farm.hpp"
+#include "include/Pipeline.hpp"
 
 
-void* increment(void* arg) {
-    int* pValue = static_cast<int*>(arg);
+int fib(int n)
+{
+  int  i, Fnew, Fold, temp,ans;
 
-    Result res;
-    if (pValue) {
-        ++(*pValue);
+    Fnew = 1;  Fold = 0;
+    for ( i = 2;
+	  i <= n;          /* apsim_loop 1 0 */
+	  i++ )
+    {
+      temp = Fnew;
+      Fnew = Fnew + Fold;
+      Fold = temp;
     }
-    
-    res.data = pValue;
-
-    return nullptr;
+    ans = Fnew;
+  return ans;
 }
 
-
+void* worker(void* arg) {
+    int* n = static_cast<int*>(arg);
+    int* result = new int;
+    *result = fib(*n);
+    return result;
+}
 
 int main() {
 
-    int lol = 0;
     //Preperation of tasks
-    std::vector<Task> tasks;
-    for(int i = 0; i < 10; ++i) {
-        Task task(&lol);
-        tasks.push_back(task);
+    ThreadSafeQueue<Task> input;
+    int n = 900090000;
+    input.enqueue(Task(&n));
+    input.enqueue(Task(&n));
+
+
+    Pipeline pipeline;
+
+    Farm farm(2, worker);
+
+    pipeline.addStage(&farm);
+
+    ThreadSafeQueue<Result> output = pipeline.execute(input);
+
+    while (!output.empty()) {
+        Result result;
+        output.dequeue(result); //might be better to have a puttask and gettask function instead of enqueue and dequeue
+        int* rs = static_cast<int*>(result.data);
+        std::cout << "Result: " << *rs << std::endl;
     }
-
-    Farm farm(4, increment);
-    farm.addTasksAndProcess(tasks);
     
-    // //submit tasks to specific workers
-    // for(int i = 0; i < numOfWorkers; ++i) {
-    //     Task task(increment, &lol);
-    //     farm.submitTask(i, task);
-    // }
-
-
-    // farm.signalEOS(); //sends EOS task to all workers to halt processing 
-
-    //collect the results from each worker's output queue
-    // std::vector<Result> allResults;
-    // for (int i = 0; i < numOfWorkers; ++i) {
-    //     Result result;
-    //     while (farm.dequeueResult(i, result)) {
-    //         allResults.push_back(result);
-    //     }
-    // }
-
-    // for (const auto& res : allResults) {
-    //     int* result = static_cast<int*>(res.data);
-    //     std::cout << "Result: " << *result << std::endl;
-    // }
-
     std::cout << "hello" << std::endl;
-
-
 
     return 0;
 }
