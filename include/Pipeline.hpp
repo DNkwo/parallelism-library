@@ -30,7 +30,8 @@ public:
             while(!outputQueue.empty()) {
                 Result result;
                 while(outputQueue.dequeue(result)) {
-                    Task newTask(result.data); //conversion of result to a task
+                    int n = 100;
+                    Task newTask(&n); //conversion of result to a task
                     newInputQueue.enqueue(newTask);
                 }
             }
