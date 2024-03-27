@@ -1,5 +1,6 @@
 #include "include/Farm.hpp"
 #include "include/Pipeline.hpp"
+#include "include/Pipe.hpp"
 
 
 int fib(int n)
@@ -19,27 +20,34 @@ int fib(int n)
   return ans;
 }
 
+
 void* worker(void* arg) {
     int* n = static_cast<int*>(arg);
     int* result = new int;
     *result = fib(*n);
+    
     return result;
 }
+
 
 int main() {
 
     //Preperation of tasks
     ThreadSafeQueue<Task> input;
-    int n = 900090000;
+    int n = 10;
     input.enqueue(Task(&n));
-    input.enqueue(Task(&n));
-
+    // input.enqueue(Task(&n));
 
     Pipeline pipeline;
 
-    Farm farm(2, worker);
+    Pipe pipe(worker);
+    Pipe pipe1(worker);
 
-    pipeline.addStage(&farm);
+    // Farm farm(1, worker);
+    // Farm farm2(1, worker);
+
+    pipeline.addStage(&pipe);
+    pipeline.addStage(&pipe1);
 
     ThreadSafeQueue<Result> output = pipeline.execute(input);
 

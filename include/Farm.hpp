@@ -11,22 +11,6 @@
 
 #define QUEUE_SIZE 100
 
-class Worker {
-public:
-    size_t id = 0;
-    //thread-safety implementation of queues (using pthread mutex)
-    ThreadSafeQueue<Task> inputQueue; 
-    ThreadSafeQueue<Result> outputQueue;
-
-    WorkerFunction workerFunction = nullptr;
-
-    // we use this flag to singal worker to stop (the thread, regardless of state of task queue)
-    volatile bool stopRequested = false; // (volatile ensures threads do not miss updates from main thread)
-
-    Worker() : stopRequested(false) {}
-
-    ~Worker() {}
-};
 
 class Farm : public Stage<Task, Result> {
 private:
@@ -52,7 +36,7 @@ public:
 
     void joinThreads();
 
-    void signalEOS();
+    void signalEOS() override;
 
     void stopWorkers();
 };

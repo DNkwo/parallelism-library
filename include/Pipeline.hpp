@@ -1,5 +1,5 @@
-#ifndef PIPE_HPP
-#define PIPE_HPP
+#ifndef PIPELINE_HPP
+#define PIPELINE_HPP
 
 #include "Stage.hpp"
 #include <vector>
@@ -17,11 +17,24 @@ public:
 
     //execute pipeline on input queue (of tasks)
     ThreadSafeQueue<Result> execute(ThreadSafeQueue<Task>& inputQueue) {
-        ThreadSafeQueue<Task> currentInputQueue = inputQueue;
+        ThreadSafeQueue<Task> currentInputQueue = inputQueue; //creates a copy of inputQueue
         ThreadSafeQueue<Result> outputQueue;
+
+        //append Eos-Task to indicate end of stream (batch)
+        Task eosTask(nullptr, true);
+        currentInputQueue.enqueue(eosTask);
+
+        int numOfStages = stages.size();
         
-        for (auto& stage : stages) {
-            outputQueue = stage->process(currentInputQueue);
+        for (int i = 0; i < numOfStages; ++i) {
+            outputQueue = stages[i]->process(currentInputQueue);
+
+            //if at last stage, we break off loop, no need to prepare for next stage
+            if(i == numOfStages-1) {
+                break;
+            }
+
+            Result result;
 
             //add outputQueue into new inputQueue
             ThreadSafeQueue<Task> newInputQueue;
@@ -29,9 +42,8 @@ public:
             //collection of results
             while(!outputQueue.empty()) {
                 Result result;
-                while(outputQueue.dequeue(result)) {
-                    int n = 100;
-                    Task newTask(&n); //conversion of result to a task
+                if(outputQueue.dequeue(result)) {
+                    Task* newTask = new Task(result.data); //conversion of result to a task
                     newInputQueue.enqueue(newTask);
                 }
             }
@@ -39,6 +51,7 @@ public:
             //pass to next pipe
             currentInputQueue = newInputQueue;
         }
+
 
         return outputQueue;
     }
