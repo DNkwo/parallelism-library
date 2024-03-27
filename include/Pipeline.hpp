@@ -34,20 +34,6 @@ public:
                 break;
             }
 
-            // Task result;
-
-            // //add outputQueue into new inputQueue
-            // ThreadSafeQueue<Task> newInputQueue;
-
-            // //passing the results down to the next stage
-            // while(!outputQueue.empty()) {
-            //     Task result;
-            //     if(outputQueue.dequeue(result)) {
-            //         Task* newTask = new Task(result.data); //conversion of result to a task
-            //         newInputQueue.enqueue(newTask);
-            //     }
-            // }
-
             //pass to next pipe
             currentInputQueue = outputQueue;
         }
@@ -70,6 +56,30 @@ public:
     ~Pipeline() {
         for (auto* stage : stages) {
             delete stage; //free each stage 
+        }
+    }
+
+
+    void terminate() {
+        ThreadSafeQueue<Task> currentInputQueue; //creates a copy of inputQueue
+        ThreadSafeQueue<Task> outputQueue;
+
+        Task shutdownTask;
+        shutdownTask.isShutdown = true;
+        currentInputQueue.enqueue(shutdownTask);
+
+        int numOfStages = stages.size();
+
+        for (int i = 0; i < numOfStages; ++i) {
+            outputQueue = stages[i]->process(currentInputQueue);
+
+            //if at last stage, we break off loop, no need to prepare for next stage
+            if(i == numOfStages-1) {
+                break;
+            }
+
+            //pass to next pipe
+            currentInputQueue = outputQueue;
         }
     }
 };

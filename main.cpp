@@ -34,9 +34,9 @@ int main() {
 
     //Preperation of tasks
     ThreadSafeQueue<Task> input;
-    int n = 8;
+    int n = 10;
     input.enqueue(Task(&n));
-    // input.enqueue(Task(&n));
+    input.enqueue(Task(&n));
 
     Pipeline pipeline;
 
@@ -54,6 +54,7 @@ int main() {
     pipeline.addStage(&pipe3);
 
     ThreadSafeQueue<Result> output = pipeline.execute(input);
+    pipeline.terminate();
 
     while (!output.empty()) {
         Result result;

@@ -47,7 +47,6 @@ ThreadSafeQueue<Task> Farm::process(ThreadSafeQueue<Task>& input) {
         }
     }
 
-
     return results;
 }
 
