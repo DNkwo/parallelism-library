@@ -9,12 +9,12 @@
 typedef void* (*WorkerFunction)(void*);
 
 
-// struct Result {
-//     void* data;
+struct Result {
+    void* data;
 
-//     // Constructor
-//     Result() : data(nullptr) {}
-// };
+    // Constructor
+    Result() : data(nullptr) {}
+};
 
 struct Task {
     void* data = nullptr;
@@ -62,13 +62,14 @@ public:
             if (inputQueue.dequeue(task)) { //maybe implementing blocking until task is available?
                 if (task.isEOS) { // Check for End-Of-Stream task (end of batch)
                     eosReceived = true;
+                    outputQueue.enqueue(task); //enqueues the EOS task for the next stage
                     continue; //continue to process next batch
                 }
 
                 if(task.isValid) {
                     isProcessing = true;
                     taskCounter++;
-                    Result result;
+                    Task result;
                     void* output = workerFunction(task.data);
                     result.data = output;
                     outputQueue.enqueue(result);
@@ -89,7 +90,7 @@ public:
 
 };
 
-template<typename Task, typename Result>
+template<typename Task>
 class Stage {
 protected:
     WorkerFunction workerFunction;
@@ -98,7 +99,7 @@ public:
 
     Stage(WorkerFunction workerFunction = nullptr) : workerFunction(workerFunction) {}
 
-    virtual ThreadSafeQueue<Result> process(ThreadSafeQueue<Task>& input) = 0; // pure virtual function to process the pattern
+    virtual ThreadSafeQueue<Task> process(ThreadSafeQueue<Task>& input) = 0; // pure virtual function to process the pattern
     virtual void signalEOS() = 0; //signalling EOS tasks
     virtual ~Stage() = default; // virtual destuctor for controlled clean up
 

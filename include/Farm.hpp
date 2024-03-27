@@ -12,7 +12,7 @@
 #define QUEUE_SIZE 100
 
 
-class Farm : public Stage<Task, Result> {
+class Farm : public Stage<Task> {
 private:
     size_t numOfWorkers;
     std::vector<pthread_t> threads;
@@ -25,14 +25,14 @@ public:
 
     ~Farm(); //destructor
 
-    ThreadSafeQueue<Result> process(ThreadSafeQueue<Task>& inputQueue) override;
+    ThreadSafeQueue<Task> process(ThreadSafeQueue<Task>& inputQueue) override;
 
     void distributeTasks(ThreadSafeQueue<Task>& tasks);
 
     //adding and removing tasks from outqueue, using these methods ensure thread-safe ways of modifying the outputqueue
-    void enqueueResult(int workerId, const Result& result);
+    void enqueueResult(int workerId, const Task& result);
 
-    bool dequeueResult(int workerId, Result& result);
+    bool dequeueResult(int workerId, Task& result);
 
     void joinThreads();
 

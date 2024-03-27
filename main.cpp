@@ -34,7 +34,7 @@ int main() {
 
     //Preperation of tasks
     ThreadSafeQueue<Task> input;
-    int n = 10;
+    int n = 8;
     input.enqueue(Task(&n));
     // input.enqueue(Task(&n));
 
@@ -42,12 +42,16 @@ int main() {
 
     Pipe pipe(worker);
     Pipe pipe1(worker);
+    Pipe pipe2(worker);
+    Pipe pipe3(worker);
 
     // Farm farm(1, worker);
     // Farm farm2(1, worker);
 
     pipeline.addStage(&pipe);
     pipeline.addStage(&pipe1);
+    pipeline.addStage(&pipe2);
+    pipeline.addStage(&pipe3);
 
     ThreadSafeQueue<Result> output = pipeline.execute(input);
 

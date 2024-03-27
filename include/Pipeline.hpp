@@ -9,16 +9,16 @@ typedef void* (*WorkerFunction)(void*);
 
 class Pipeline {
 public:
-    std::vector<Stage<Task, Result>*> stages; //vector of pointers to the stages
+    std::vector<Stage<Task>*> stages; //vector of pointers to the stages
 
-    void addStage(Stage<Task, Result>* stage) {
+    void addStage(Stage<Task>* stage) {
         stages.push_back(stage);
     }
 
     //execute pipeline on input queue (of tasks)
     ThreadSafeQueue<Result> execute(ThreadSafeQueue<Task>& inputQueue) {
         ThreadSafeQueue<Task> currentInputQueue = inputQueue; //creates a copy of inputQueue
-        ThreadSafeQueue<Result> outputQueue;
+        ThreadSafeQueue<Task> outputQueue;
 
         //append Eos-Task to indicate end of stream (batch)
         Task eosTask(nullptr, true);
@@ -34,26 +34,36 @@ public:
                 break;
             }
 
-            Result result;
+            // Task result;
 
-            //add outputQueue into new inputQueue
-            ThreadSafeQueue<Task> newInputQueue;
+            // //add outputQueue into new inputQueue
+            // ThreadSafeQueue<Task> newInputQueue;
 
-            //collection of results
-            while(!outputQueue.empty()) {
-                Result result;
-                if(outputQueue.dequeue(result)) {
-                    Task* newTask = new Task(result.data); //conversion of result to a task
-                    newInputQueue.enqueue(newTask);
-                }
-            }
+            // //passing the results down to the next stage
+            // while(!outputQueue.empty()) {
+            //     Task result;
+            //     if(outputQueue.dequeue(result)) {
+            //         Task* newTask = new Task(result.data); //conversion of result to a task
+            //         newInputQueue.enqueue(newTask);
+            //     }
+            // }
 
             //pass to next pipe
-            currentInputQueue = newInputQueue;
+            currentInputQueue = outputQueue;
         }
 
+        ThreadSafeQueue<Result> results;
+        //converting into Result
+        while(!outputQueue.empty()) {
+            Task task;
+            if(outputQueue.dequeue(task) && !task.isEOS) { //ignores eosTasks from the result
+                Result result; //conversion of task to result
+                result.data = task.data;
+                results.enqueue(result);
+            }
+        }
 
-        return outputQueue;
+        return results;
     }
 
     //destructor (for clean up)

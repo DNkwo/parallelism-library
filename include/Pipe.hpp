@@ -4,14 +4,14 @@
 #include "Stage.hpp"
 
 
-class Pipe : public Stage<Task, Result> {
+class Pipe : public Stage<Task> {
 
 private:
     Worker worker;
     pthread_t thread;
 public:
 
-    Pipe(WorkerFunction workerFunction) : Stage<Task, Result>(workerFunction){
+    Pipe(WorkerFunction workerFunction) : Stage<Task>(workerFunction){
         //initialise worker
         worker.workerFunction = workerFunction;
 
@@ -23,7 +23,7 @@ public:
         pthread_join(this->thread, nullptr);
     } //destructor
 
-    ThreadSafeQueue<Result> process(ThreadSafeQueue<Task> &input) override {
+    ThreadSafeQueue<Task> process(ThreadSafeQueue<Task> &input) override {
 
         while (!input.empty()) {
             Task task;
@@ -45,8 +45,8 @@ public:
             //probably put some sleep function here
         }
 
-        ThreadSafeQueue<Result> results;
-        Result result;
+        ThreadSafeQueue<Task> results;
+        Task result;
 
         while(worker.outputQueue.dequeue(result)) {
             results.enqueue(result);

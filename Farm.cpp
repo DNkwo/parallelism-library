@@ -5,7 +5,7 @@
 #include <vector>
 
 Farm::Farm(int numOfWorkers, WorkerFunction workerFunction)
-    : Stage<Task, Result>(workerFunction), numOfWorkers(numOfWorkers) {
+    : Stage<Task>(workerFunction), numOfWorkers(numOfWorkers) {
     workers.resize(numOfWorkers);
 
     //assign id and the worker function to each worker
@@ -31,17 +31,17 @@ Farm::~Farm() {
     }
 }
 
-ThreadSafeQueue<Result> Farm::process(ThreadSafeQueue<Task>& input) {
+ThreadSafeQueue<Task> Farm::process(ThreadSafeQueue<Task>& input) {
     //preparing input
     distributeTasks(input);
 
     joinThreads();
 
-    ThreadSafeQueue<Result> results;
+    ThreadSafeQueue<Task> results;
 
     // //collection of results from each workers queue
     for (int i = 0; i < numOfWorkers; ++i) {
-        Result result;
+        Task result;
         while(dequeueResult(i, result)) {
             results.enqueue(result);
         }
@@ -74,13 +74,13 @@ void Farm::distributeTasks(ThreadSafeQueue<Task>& tasks) {
 }
 
 // Add a task to the output queue for a specific worker
-void Farm::enqueueResult(int workerId, const Result& result) {
+void Farm::enqueueResult(int workerId, const Task& result) {
     std::cout << "result has been pushed" << std::endl;
     workers[workerId].outputQueue.enqueue(result);
 }
 
 // Remove and retrieve a task from the output queue for a specific worker
-bool Farm::dequeueResult(int workerId, Result& result) {
+bool Farm::dequeueResult(int workerId, Task& result) {
     return workers[workerId].outputQueue.dequeue(result);
 
 }
