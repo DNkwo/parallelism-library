@@ -8,16 +8,17 @@ Farm::Farm(int numOfWorkers, WorkerFunction workerFunction)
     : Stage<Task>(workerFunction), numOfWorkers(numOfWorkers) {
     workers.resize(numOfWorkers);
 
-    //assign id and the worker function to each worker
+    //initialsie workers, assign id and the worker function to each worker
     for (int i = 0; i < numOfWorkers; ++i) {
-        workers[i].id = i + 1;
-        workers[i].workerFunction = workerFunction;
+        workers[i] = new Worker();
+        workers[i]->id = i + 1;
+        workers[i]->workerFunction = workerFunction;
     }
 
      //create worker threads
     for (int i = 0; i < numOfWorkers; ++i) {
         pthread_t thread;
-        pthread_create(&thread, nullptr, workerWrapper, &workers[i]); //passes the worker[i] as an argument to the workerFunction
+        pthread_create(&thread, nullptr, workerWrapper, workers[i]); //passes the worker[i] as an argument to the workerFunction
         threads.push_back(thread);
     }
 
@@ -64,7 +65,7 @@ void Farm::distributeTasks(ThreadSafeQueue<Task>& tasks) {
             signalEOS();
         }
         else if (!eosReceived) { //normal task distribution (round-robin)
-            workers[currentWorker].inputQueue.enqueue(task);
+            workers[currentWorker]->inputQueue->enqueue(task);
             currentWorker = (currentWorker + 1) % numOfWorkers;
         }
 
@@ -75,21 +76,21 @@ void Farm::distributeTasks(ThreadSafeQueue<Task>& tasks) {
 // Add a task to the output queue for a specific worker
 void Farm::enqueueResult(int workerId, const Task& result) {
     std::cout << "result has been pushed" << std::endl;
-    workers[workerId].outputQueue.enqueue(result);
+    workers[workerId]->outputQueue->enqueue(result);
 }
 
 // Remove and retrieve a task from the output queue for a specific worker
 bool Farm::dequeueResult(int workerId, Task& result) {
-    return workers[workerId].outputQueue.dequeue(result);
+    return workers[workerId]->outputQueue->dequeue(result);
 
 }
 
 //Instead of making an EOS flag directly to the worker, creating an EOS task instead allows tasks to finish
 //without abruptly shutting down and extra synchronisation
 void Farm::signalEOS() {
-    for(Worker& worker : workers) {
+    for(Worker* worker : workers) {
         Task eosTask(nullptr, true); //create EOS task
-        worker.inputQueue.enqueue(eosTask);
+        worker->inputQueue->enqueue(eosTask);
     }
 }
 
@@ -103,10 +104,12 @@ void Farm::joinThreads() {
 //method to manually stop all workers (handles thread clean up)
 void Farm::stopWorkers() {
     //signal all worker threads to stop manually
-    for (Worker& worker : workers) {
-        worker.stopRequested = true;
+    for (Worker* worker : workers) {
+        worker->stopRequested = true;
     }
 }
+
+
 
 
 

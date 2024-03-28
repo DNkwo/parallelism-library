@@ -16,8 +16,6 @@ class Farm : public Stage<Task> {
 private:
     size_t numOfWorkers;
     std::vector<pthread_t> threads;
-    std::vector<Worker> workers;
-
     size_t currentWorker = 0; //current target worker (used for round-robin distribution)
 
 public:
@@ -39,6 +37,7 @@ public:
     void signalEOS() override;
 
     void stopWorkers();
+    
 };
 
 #endif

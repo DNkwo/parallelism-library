@@ -38,8 +38,8 @@ class Worker {
 public:
     size_t id = 0;
     //thread-safety implementation of queues (using pthread mutex)
-    ThreadSafeQueue<Task> inputQueue; 
-    ThreadSafeQueue<Task> outputQueue;
+    ThreadSafeQueue<Task>* inputQueue; 
+    ThreadSafeQueue<Task>* outputQueue;
 
     WorkerFunction workerFunction = nullptr;
 
@@ -51,24 +51,27 @@ public:
     int taskCounter = 0;
     bool eosReceived = false;
 
-    Worker() : stopRequested(false) {}
+    Worker() : stopRequested(false) {
+
+        //initiate outputQueue
+        outputQueue = new ThreadSafeQueue<Task>;
+    }
 
     ~Worker() {}
 
     void run() {
         while (!stopRequested) {
             Task task;
-            if (inputQueue.dequeue(task)) { //maybe implementing blocking until task is available?
-                
+            if (inputQueue->dequeue(task)) { //maybe implementing blocking until task is available?
                 if (task.isEOS) { // Check for End-Of-Stream task (end of batch)
                     eosReceived = true;
-                    outputQueue.enqueue(task); //enqueues the EOS task for the next stage
+                    outputQueue->enqueue(task); //enqueues the EOS task for the next stage
                     continue; //continue to process next batch
                 }
 
                 if (task.isShutdown) {
                     stopRequested = true; //stops thread loop
-                    outputQueue.enqueue(task); //enqueues shutdown task for next stages
+                    outputQueue->enqueue(task); //enqueues shutdown task for next stages
                     continue;
                 }
 
@@ -78,7 +81,7 @@ public:
                     Task result;
                     void* output = workerFunction(task.data);
                     result.data = output;
-                    outputQueue.enqueue(result);
+                    outputQueue->enqueue(result);
                     taskCounter--;
                     isProcessing = false;
                 }
@@ -87,7 +90,7 @@ public:
             }
 
             //after an EOS, we reset and prepare for next batch of tasks
-            if(eosReceived && inputQueue.empty() && taskCounter == 0) {
+            if(eosReceived && inputQueue->empty() && taskCounter == 0) {
                 eosReceived = false;
             }
         }
@@ -101,6 +104,8 @@ protected:
     WorkerFunction workerFunction;
     bool eosReceived = false;
     bool isShutdown = false;
+    std::vector<Worker*> workers;
+    ThreadSafeQueue<Task>* inputQueue;
 public:
 
     Stage(WorkerFunction workerFunction = nullptr) : workerFunction(workerFunction) {}
@@ -110,13 +115,19 @@ public:
     virtual void signalShutdown() = 0; //signalling shutdown tasks
     virtual ~Stage() = default; // virtual destuctor for controlled clean up
 
-
     static void* workerWrapper(void* arg) {
         Worker* worker = static_cast<Worker*>(arg);
         worker->run(); 
         return nullptr;
     }
-    
+
+    ThreadSafeQueue<Task>* getInputQueue() {
+        return this->inputQueue;
+    }
+
+    std::vector<Worker*> getWorkers() {
+        return workers;
+    }
  
 };
 
