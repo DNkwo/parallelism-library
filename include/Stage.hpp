@@ -46,10 +46,6 @@ public:
     // we use this flag to singal worker to stop (the thread, regardless of state of task queue)
     volatile bool stopRequested = false; // (volatile ensures threads do not miss updates from main thread)
 
-    //for synchronsiation
-    bool isProcessing = false;
-    int taskCounter = 0;
-    bool eosReceived = false;
 
     Worker() : stopRequested(false) {
 
@@ -64,7 +60,6 @@ public:
             Task task;
             if (inputQueue->dequeue(task)) { //maybe implementing blocking until task is available?
                 if (task.isEOS) { // Check for End-Of-Stream task (end of batch)
-                    eosReceived = true;
                     outputQueue->enqueue(task); //enqueues the EOS task for the next stage
                     continue; //continue to process next batch
                 }
@@ -76,23 +71,16 @@ public:
                 }
 
                 if(task.isValid) {
-                    isProcessing = true;
-                    taskCounter++;
+                    std::cout << this->id << std::endl;
                     Task result;
                     void* output = workerFunction(task.data);
                     result.data = output;
                     outputQueue->enqueue(result);
-                    taskCounter--;
-                    isProcessing = false;
                 }
             } else {
                 sched_yield(); // Yield if no task was fetched, to reduce busy waiting
             }
 
-            //after an EOS, we reset and prepare for next batch of tasks
-            if(eosReceived && inputQueue->empty() && taskCounter == 0) {
-                eosReceived = false;
-            }
         }
     }
 
@@ -112,7 +100,7 @@ public:
 
     virtual ThreadSafeQueue<Task> process(ThreadSafeQueue<Task>& input) = 0; // pure virtual function to process the pattern
     virtual void signalEOS() = 0; //signalling EOS tasks
-    virtual void signalShutdown() = 0; //signalling shutdown tasks
+    // virtual void signalShutdown() = 0; //signalling shutdown tasks
     virtual ~Stage() = default; // virtual destuctor for controlled clean up
 
     static void* workerWrapper(void* arg) {

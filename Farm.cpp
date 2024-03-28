@@ -5,7 +5,9 @@
 #include <vector>
 
 Farm::Farm(int numOfWorkers, WorkerFunction workerFunction)
-    : Stage<Task>(workerFunction), numOfWorkers(numOfWorkers) {
+    : Stage<Task>(workerFunction), numOfWorkers(numOfWorkers) {    
+    this->inputQueue = new ThreadSafeQueue<Task>;
+    
     workers.resize(numOfWorkers);
 
     //initialsie workers, assign id and the worker function to each worker
@@ -13,6 +15,7 @@ Farm::Farm(int numOfWorkers, WorkerFunction workerFunction)
         workers[i] = new Worker();
         workers[i]->id = i + 1;
         workers[i]->workerFunction = workerFunction;
+        workers[i]->inputQueue = this->inputQueue; //assigns this workers input queue to be the input queue of the stage
     }
 
      //create worker threads

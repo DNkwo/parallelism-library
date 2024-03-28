@@ -11,11 +11,12 @@ private:
 public:
 
     Pipe(WorkerFunction workerFunction) : Stage<Task>(workerFunction){
+        this->inputQueue = new ThreadSafeQueue<Task>;
+        
+        
         workers.push_back(new Worker());
         //initialise worker
         workers[0]->workerFunction = workerFunction;
-
-        this->inputQueue = new ThreadSafeQueue<Task>;
 
         // //assigns the worker's input queue to be the same as stage input queue
         workers[0]->inputQueue = this->inputQueue;
@@ -61,21 +62,15 @@ public:
         return results;
     }
 
-    void waitForTaskCompletion() {
-        while((workers[0]->isProcessing || workers[0]->taskCounter != 0 || !workers[0]->eosReceived) && !isShutdown){
-            //probably put some sleep function here
-        }
-    }
-
     void signalEOS() override {
         Task eosTask(nullptr, true);
         workers[0]->inputQueue->enqueue(eosTask);
     }
 
-    void signalShutdown() override {
-        Task signalShutdown(nullptr);
-        signalShutdown.isShutdown = true;
-    }
+    // void signalShutdown() override {
+    //     Task signalShutdown(nullptr);
+    //     signalShutdown.isShutdown = true;
+    // }
 
 
 
