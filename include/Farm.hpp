@@ -18,24 +18,31 @@ private:
     size_t currentWorker = 0; //current target worker (used for round-robin distribution)
 
 public:
-    Farm(int numOfWorkers, WorkerFunction workerFunction);
 
-    ~Farm(); //destructor
+    Farm(int numOfWorkers, WorkerFunction workerFunction) : Stage<Task>(workerFunction), numOfWorkers(numOfWorkers) {    
 
-    ThreadSafeQueue<Task> process(ThreadSafeQueue<Task>& inputQueue) override;
+        workers.resize(numOfWorkers);
 
-    void distributeTasks(ThreadSafeQueue<Task>& tasks);
+        //initialsie workers, assign id and the worker function to each worker
+        for (int i = 0; i < numOfWorkers; ++i) {
+            workers[i] = new Worker();
+            workers[i]->id = i + 1;
+            workers[i]->workerFunction = workerFunction;
+        }
 
-    //adding and removing tasks from outqueue, using these methods ensure thread-safe ways of modifying the outputqueue
-    void enqueueResult(int workerId, const Task& result);
+        //create worker threads
+        for (int i = 0; i < numOfWorkers; ++i) {
+            pthread_t thread;
+            pthread_create(&workers[i]->thread, nullptr, workerWrapper, workers[i]); //passes the worker[i] as an argument to the workerFunction
+        }
 
-    bool dequeueResult(int workerId, Task& result);
+    }
 
-    void joinThreads();
-
-    void signalEOS() override;
-
-    void stopWorkers();
+    ~Farm(){
+        for (int i = 0; i < numOfWorkers; ++i) {
+            pthread_join(workers[i]->thread, nullptr);
+        }
+    }
 
 };
 

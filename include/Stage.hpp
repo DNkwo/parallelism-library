@@ -44,10 +44,8 @@ public:
     pthread_t thread;
 
     WorkerFunction workerFunction = nullptr;
-
     // we use this flag to singal worker to stop (the thread, regardless of state of task queue)
     volatile bool stopRequested = false; // (volatile ensures threads do not miss updates from main thread)
-
 
     Worker() : stopRequested(false) {
         inputQueue = new ThreadSafeQueue<Task>;
@@ -108,10 +106,6 @@ protected:
 public:
 
     Stage(WorkerFunction workerFunction = nullptr) : workerFunction(workerFunction) {}
-
-    virtual ThreadSafeQueue<Task> process(ThreadSafeQueue<Task>& input) = 0; // pure virtual function to process the pattern
-    virtual void signalEOS() = 0; //signalling EOS tasks
-    // virtual void signalShutdown() = 0; //signalling shutdown tasks
     virtual ~Stage() = default; // virtual destuctor for controlled clean up
 
     static void* workerWrapper(void* arg) {
