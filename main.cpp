@@ -1,7 +1,7 @@
-#include "include/Farm.hpp"
-#include "include/Pipeline.hpp"
-#include "include/Pipe.hpp"
-#include "include/StageManager.hpp"
+#include "para-pat/include/Farm.hpp"
+#include "para-pat/include/Pipeline.hpp"
+#include "para-pat/include/Pipe.hpp"
+#include "para-pat/include/StageManager.hpp"
 
 
 int fib(int n)
@@ -33,41 +33,44 @@ void* worker(void* arg) {
 
 int main() {
 
-    //Preperation of tasks
-    ThreadSafeQueue<Task> input;
-    int* taskData;
-    for (int i = 0; i < 8; ++i) {
-        taskData = new int(3);
-        input.enqueue(Task(taskData));
-    }
-
     StageManager manager;
 
     Pipe pipe(worker);
     Farm farm(1, worker);
-    Farm farm2(3, worker);
-    Farm farm3(2, worker);
-    Farm farm4(3, worker);
-    Pipe pipe1(worker);
+    // Farm farm2(3, worker);
+    // Farm farm3(2, worker);
+    // Farm farm4(3, worker);
+    // Pipe pipe1(worker);
 
     manager.addStage(&pipe);
     manager.addStage(&farm);
-    manager.addStage(&farm2);
-    manager.addStage(&farm3);
-    manager.addStage(&farm4);
-    manager.addStage(&pipe1);
+    // manager.addStage(&farm2);
+    // manager.addStage(&farm3);
+    // manager.addStage(&farm4);
+    // manager.addStage(&pipe1);
 
-    ThreadSafeQueue<Result> output = manager.execute(input);
+
+    ThreadSafeQueue<Task> inputQueue;
+    for (int i = 0; i < 1; i++) {
+        int* taskData = new int(5);
+        inputQueue.enqueue(Task(taskData));
+    }
+
+    ThreadSafeQueue<Result> output = manager.execute(inputQueue);
     manager.terminate();
 
+
     while (!output.empty()) {
-        Result result;
-        output.dequeue(result); //might be better to have a puttask and gettask function instead of enqueue and dequeue
-        int* rs = static_cast<int*>(result.data);
-        std::cout << "Result: " << *rs << std::endl;
+      Result result;
+      if (output.dequeue(result)) {
+          int* rs = static_cast<int*>(result.data);
+          std::cout << "Result: " << *rs << std::endl;
+          delete rs; //prevent memory leaks
+      }
     }
     
-    std::cout << "hello" << std::endl;
+    std::cout << "dhdd" << std::endl;
+
 
     return 0;
 }

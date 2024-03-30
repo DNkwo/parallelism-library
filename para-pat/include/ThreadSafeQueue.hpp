@@ -14,7 +14,10 @@ private:
 public:
     //constructor
     ThreadSafeQueue() {
-        pthread_mutex_init(&mutex, nullptr);
+        int result = pthread_mutex_init(&mutex, nullptr);
+        if (result != 0) {
+            std::cerr << "Failed to initialize mutex: " << result << std::endl;
+        }
     }
 
     ~ThreadSafeQueue() {
