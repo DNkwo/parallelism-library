@@ -41,6 +41,8 @@ public:
     ThreadSafeQueue<Task>* inputQueue; 
     ThreadSafeQueue<Task>* outputQueue;
 
+    pthread_t thread;
+
     WorkerFunction workerFunction = nullptr;
 
     // we use this flag to singal worker to stop (the thread, regardless of state of task queue)
@@ -48,8 +50,8 @@ public:
 
 
     Worker() : stopRequested(false) {
-
-        //initiate outputQueue
+        inputQueue = new ThreadSafeQueue<Task>;
+        //initiate input and output queues
         outputQueue = new ThreadSafeQueue<Task>;
     }
 
@@ -67,11 +69,10 @@ public:
                 if (task.isShutdown) {
                     stopRequested = true; //stops thread loop
                     outputQueue->enqueue(task); //enqueues shutdown task for next stages
-                    continue;
+                    break;
                 }
 
                 if(task.isValid) {
-                    std::cout << this->id << std::endl;
                     Task result;
                     void* output = workerFunction(task.data);
                     result.data = output;
@@ -81,6 +82,17 @@ public:
                 sched_yield(); // Yield if no task was fetched, to reduce busy waiting
             }
 
+        }
+
+        //  // Propagate the shutdown task to the next stage
+        while (!inputQueue->empty()) {
+            Task task;
+            if (inputQueue->dequeue(task)) {
+                if (task.isShutdown) {
+                    outputQueue->enqueue(task);
+                    break;
+                }
+            }
         }
     }
 
@@ -93,7 +105,6 @@ protected:
     bool eosReceived = false;
     bool isShutdown = false;
     std::vector<Worker*> workers;
-    ThreadSafeQueue<Task>* inputQueue;
 public:
 
     Stage(WorkerFunction workerFunction = nullptr) : workerFunction(workerFunction) {}
@@ -106,12 +117,9 @@ public:
     static void* workerWrapper(void* arg) {
         Worker* worker = static_cast<Worker*>(arg);
         worker->run(); 
-        return nullptr;
+        return worker;
     }
 
-    ThreadSafeQueue<Task>* getInputQueue() {
-        return this->inputQueue;
-    }
 
     std::vector<Worker*> getWorkers() {
         return workers;

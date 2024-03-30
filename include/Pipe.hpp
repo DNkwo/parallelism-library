@@ -6,12 +6,10 @@
 
 class Pipe : public Stage<Task> {
 
-private:
-    pthread_t thread;
 public:
 
     Pipe(WorkerFunction workerFunction) : Stage<Task>(workerFunction){
-        this->inputQueue = new ThreadSafeQueue<Task>;
+        // this->inputQueue = new ThreadSafeQueue<Task>;
         
         
         workers.push_back(new Worker());
@@ -19,14 +17,14 @@ public:
         workers[0]->workerFunction = workerFunction;
 
         // //assigns the worker's input queue to be the same as stage input queue
-        workers[0]->inputQueue = this->inputQueue;
+        // workers[0]->inputQueue = this->inputQueue;
 
         //start thread
-        pthread_create(&this->thread, nullptr, workerWrapper, workers[0]);
+        pthread_create(&workers[0]->thread, nullptr, workerWrapper, workers[0]);
     }
 
     ~Pipe(){
-        pthread_join(this->thread, nullptr);
+        pthread_join(workers[0]->thread, nullptr);
     } //destructor
 
     ThreadSafeQueue<Task> process(ThreadSafeQueue<Task> &input) override {

@@ -1,6 +1,7 @@
 #include "include/Farm.hpp"
 #include "include/Pipeline.hpp"
 #include "include/Pipe.hpp"
+#include "include/StageManager.hpp"
 
 
 int fib(int n)
@@ -34,36 +35,30 @@ int main() {
 
     //Preperation of tasks
     ThreadSafeQueue<Task> input;
-    int n = 10;
-    input.enqueue(Task(&n));
-    input.enqueue(Task(&n));
-    input.enqueue(Task(&n));
-    input.enqueue(Task(&n));
-    input.enqueue(Task(&n));
-    input.enqueue(Task(&n));
-    input.enqueue(Task(&n));
-    input.enqueue(Task(&n));
-    input.enqueue(Task(&n));
+    int* taskData;
+    for (int i = 0; i < 8; ++i) {
+        taskData = new int(3);
+        input.enqueue(Task(taskData));
+    }
 
-    Pipeline pipeline;
+    StageManager manager;
 
-    // Pipe pipe(worker);
-    // Pipe pipe1(worker);
-    // Pipe pipe2(worker);
-    // Pipe pipe3(worker);
+    Pipe pipe(worker);
+    Farm farm(1, worker);
+    Farm farm2(3, worker);
+    Farm farm3(2, worker);
+    Farm farm4(3, worker);
+    Pipe pipe1(worker);
 
-    Farm farm(3, worker);
-    // Farm farm2(1, worker);
+    manager.addStage(&pipe);
+    manager.addStage(&farm);
+    manager.addStage(&farm2);
+    manager.addStage(&farm3);
+    manager.addStage(&farm4);
+    manager.addStage(&pipe1);
 
-    // pipeline.addStage(&pipe);
-    // pipeline.addStage(&pipe1);
-    // pipeline.addStage(&pipe2);
-    // pipeline.addStage(&pipe3);
-
-    pipeline.addStage(&farm);
-
-    ThreadSafeQueue<Result> output = pipeline.execute(input);
-    pipeline.terminate();
+    ThreadSafeQueue<Result> output = manager.execute(input);
+    manager.terminate();
 
     while (!output.empty()) {
         Result result;

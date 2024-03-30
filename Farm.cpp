@@ -6,8 +6,8 @@
 
 Farm::Farm(int numOfWorkers, WorkerFunction workerFunction)
     : Stage<Task>(workerFunction), numOfWorkers(numOfWorkers) {    
-    this->inputQueue = new ThreadSafeQueue<Task>;
-    
+    // this->inputQueue = new ThreadSafeQueue<Task>;
+
     workers.resize(numOfWorkers);
 
     //initialsie workers, assign id and the worker function to each worker
@@ -15,23 +15,20 @@ Farm::Farm(int numOfWorkers, WorkerFunction workerFunction)
         workers[i] = new Worker();
         workers[i]->id = i + 1;
         workers[i]->workerFunction = workerFunction;
-        workers[i]->inputQueue = this->inputQueue; //assigns this workers input queue to be the input queue of the stage
+        // workers[i]->inputQueue = this->inputQueue; //assigns this workers input queue to be the input queue of the stage
     }
 
      //create worker threads
     for (int i = 0; i < numOfWorkers; ++i) {
         pthread_t thread;
-        pthread_create(&thread, nullptr, workerWrapper, workers[i]); //passes the worker[i] as an argument to the workerFunction
-        threads.push_back(thread);
+        pthread_create(&workers[i]->thread, nullptr, workerWrapper, workers[i]); //passes the worker[i] as an argument to the workerFunction
     }
 
 }
 
 Farm::~Farm() {
-    for (auto& t : threads) {
-        if (t) {
-            pthread_join(t, nullptr); //ensure all threads are joined
-        }
+    for (int i = 0; i < numOfWorkers; ++i) {
+        pthread_join(workers[i]->thread, nullptr);
     }
 }
 
@@ -99,9 +96,9 @@ void Farm::signalEOS() {
 
 void Farm::joinThreads() {
     //join all worker threads to ensure they've finished
-    for (auto& thread : threads) {
-        pthread_join(thread, nullptr);
-    }
+    // for (auto& thread : threads) {
+    //     pthread_join(thread, nullptr);
+    // }
 }
 
 //method to manually stop all workers (handles thread clean up)
