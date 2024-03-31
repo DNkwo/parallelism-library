@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "para-pat/include/Farm.hpp"
+#include "para-pat/include/Pipeline.hpp"
 #include "para-pat/include/Pipe.hpp"
 #include "para-pat/include/StageManager.hpp"
 
@@ -30,41 +31,31 @@ void* payload2(void* arg) {
 }
 
 int main() {
-   
-    // Create a pipeline with two stages
-    Pipe stage1(payload1);
-    Pipe stage2(payload2);
+    StageManager manager;
 
-    // Create a pipeline manager and add the stages
-    StageManager pipelineManager;
-    pipelineManager.addStage(&stage1);
-    pipelineManager.addStage(&stage2);
+    Pipe pipe1(payload1);
+    Pipe pipe2(payload2);
 
+    manager.addStage(&pipe1);
+    manager.addStage(&pipe2);
 
-    //add the tasks
     ThreadSafeQueue<Task> inputQueue;
-    // for (int i = 0; i < 3; i++) {
-    //     int* taskData = new int(i);
-    //     Task task = new Task(taskData);
-    //     pipelineManager.addTask(task);
-    // }
-
-    // Execute the pipeline
-    ThreadSafeQueue<Result> outputQueue = pipelineManager.execute(inputQueue);
-    pipelineManager.terminate();
-
-    // Process the results
-    while (!outputQueue.empty()) {
-      std::cout << "Result: " << std::endl;
-      Result result;
-      if (outputQueue.dequeue(result)) {
-          int* rs = static_cast<int*>(result.data);
-          std::cout << "Result: " << *rs << std::endl;
-          delete rs; //prevent memory leaks
-      }
+    for (int i = 0; i < 2; i++) {
+        int* taskData = new int(i);
+        inputQueue.enqueue(Task(taskData));
     }
 
-  
+    ThreadSafeQueue<Result> output = manager.execute(inputQueue);
+    manager.terminate();
+
+    while (!output.empty()) {
+        Result result;
+        if (output.dequeue(result)) {
+            int* res2 = static_cast<int*>(result.data);
+            printf("%d\n", *res2);
+            delete res2;
+        }
+    }
 
     return 0;
 }
