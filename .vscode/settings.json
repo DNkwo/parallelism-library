@@ -54,6 +54,13 @@
         "streambuf": "cpp",
         "thread": "cpp",
         "typeinfo": "cpp",
-        "queue": "cpp"
+        "queue": "cpp",
+        "charconv": "cpp",
+        "chrono": "cpp",
+        "format": "cpp",
+        "iomanip": "cpp",
+        "span": "cpp",
+        "variant": "cpp",
+        "cstdarg": "cpp"
     }
 }

@@ -10,7 +10,9 @@ template<typename T>
 class ThreadSafeQueue {
 private:
     pthread_mutex_t mutex;
+    pthread_cond_t cond;
     std::queue<T> queue;
+
 public:
     //constructor
     ThreadSafeQueue() {
@@ -18,16 +20,22 @@ public:
         if (result != 0) {
             std::cerr << "Failed to initialize mutex: " << result << std::endl;
         }
+        result = pthread_cond_init(&cond, nullptr);
+        if (result != 0) {
+            std::cerr << "Failed to initialize condition variable: " << result << std::endl;
+        }
     }
 
     ~ThreadSafeQueue() {
         pthread_mutex_destroy(&mutex);
+        pthread_cond_destroy(&cond);
     }
 
     //add item to queue
     void enqueue(const T& item) {
         pthread_mutex_lock(&mutex);
         queue.push(item);
+        pthread_cond_signal(&cond); // Signal the condition variable
         pthread_mutex_unlock(&mutex);
     }
 
@@ -52,7 +60,10 @@ public:
     }
 
     size_t size() {
-        return queue.size();
+        pthread_mutex_lock(&mutex);
+        size_t queueSize = queue.size();
+        pthread_mutex_unlock(&mutex);
+        return queueSize;
     }
 
 

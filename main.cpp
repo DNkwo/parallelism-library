@@ -37,28 +37,29 @@ int main() {
 
     Pipe pipe(worker);
     Farm farm(1, worker);
-    // Farm farm2(3, worker);
-    // Farm farm3(2, worker);
-    // Farm farm4(3, worker);
-    // Pipe pipe1(worker);
+    Farm farm2(3, worker);
+    Farm farm3(2, worker);
+    Farm farm4(3, worker);
+    Pipe pipe1(worker);
 
     manager.addStage(&pipe);
     manager.addStage(&farm);
-    // manager.addStage(&farm2);
-    // manager.addStage(&farm3);
-    // manager.addStage(&farm4);
-    // manager.addStage(&pipe1);
+    manager.addStage(&farm2);
+    manager.addStage(&farm3);
+    manager.addStage(&farm4);
+    manager.addStage(&pipe1);
 
 
     ThreadSafeQueue<Task> inputQueue;
-    for (int i = 0; i < 1; i++) {
-        int* taskData = new int(5);
+    for (int i = 0; i < 2; i++) {
+        int* taskData = new int(120);
         inputQueue.enqueue(Task(taskData));
     }
 
     ThreadSafeQueue<Result> output = manager.execute(inputQueue);
     manager.terminate();
 
+    std::cout << output.size() << std::endl;
 
     while (!output.empty()) {
       Result result;

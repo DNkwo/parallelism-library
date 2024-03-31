@@ -20,6 +20,9 @@ public:
 
     void terminate();
 
+    void test();
+
+
     std::vector<Stage<Task>*> getStages();
 
 };

@@ -53,7 +53,11 @@ public:
         outputQueue = new ThreadSafeQueue<Task>;
     }
 
-    ~Worker() {}
+    ~Worker() {
+        //de allocate the input and output queues
+        delete inputQueue;
+        delete outputQueue;
+    }
 
     void run() {
         while (!stopRequested) {

@@ -4,9 +4,6 @@ void StageManager::addStage(Stage<Task>* stage) {
     pipeline.addStage(stage);
 }
 
-// void StageManager::addTask(Task& task) {
-//     inputQueue.enqueue(task);
-// }
 
 void StageManager::setupInterrelations() {
     std::vector<Stage<Task>*> stages = pipeline.getStages();
@@ -27,6 +24,7 @@ void StageManager::terminate() {
     pipeline.terminate();
     stopRequested = true;
     pthread_join(managerThread, nullptr);
+    pipeline.test();
 }
 
 void* StageManager::managerThreadWrapper(void* arg) {
@@ -54,7 +52,6 @@ void StageManager::run() {
                         for (Worker* stage2Worker : stage2Workers) {
                             stage2Worker->inputQueue->enqueue(task);
                         }
-                        break;
                     } else {
                         stage2Workers[currentWorker]->inputQueue->enqueue(task); //place in a stage 2 worker input queue
                         currentWorker = (currentWorker + 1) % stage2Workers.size(); //update index (max is total workers in stage 2)

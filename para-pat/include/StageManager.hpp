@@ -13,9 +13,6 @@ private:
     volatile bool stopRequested = false;
     pthread_t managerThread;
 
-    //input queue
-    // ThreadSafeQueue<Task> inputQueue;
-
 public:
 
     StageManager() {}

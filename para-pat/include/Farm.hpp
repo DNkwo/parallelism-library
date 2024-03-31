@@ -9,7 +9,6 @@
 #include <vector>
 #include <unistd.h>
 
-#define QUEUE_SIZE 100
 
 class Farm : public Stage<Task> {
 private:
