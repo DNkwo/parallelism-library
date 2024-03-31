@@ -26,7 +26,7 @@ const int mask_dim=8;
 unsigned short **images;
 unsigned short **masks;
 unsigned short **out_images;
-int nr_images=20;
+int nr_images=100;
 
 typedef std::string* string_p;
 
@@ -91,7 +91,6 @@ typedef struct {
   unsigned short* mask;
 } task_t;
 
-//making it compatible with p_threads
 void* read_image_and_mask(void* arg) {
   string_p image_name_p = static_cast<string_p>(arg);
   task_t* task = new task_t;
@@ -109,7 +108,6 @@ void* read_image_and_mask(void* arg) {
 
 }
 
-//making it compatible with p_threads
 void* process_image(void* arg) {
   task_t* task = static_cast<task_t*>(arg); //extract arguments from struct
   unsigned short *in_image = task->image;
@@ -152,7 +150,7 @@ int main(int argc, char * argv[]) {
   // if (argc<3)
   //  std::cerr << "use: " << argv[0] << " <imageSize> <nrImages> [<chunking>]\n";
   dim = 1024 ; // atoi(argv[1]);
-  nr_images = 20 ; // atoi(argv[2]);
+  nr_images = 50 ; // atoi(argv[2]);
   
   images = new unsigned short *[nr_images];
   masks = new unsigned short *[nr_images];
@@ -168,10 +166,10 @@ int main(int argc, char * argv[]) {
   double beginning = get_current_time();
 
   StageManager manager;
-  Farm farm(4, process_image); // Adjust the number of workers as needed
-  Pipe pipe(read_image_and_mask);
-  manager.addStage(&pipe);
+  Farm farm(2, read_image_and_mask);
+  Farm farm2(6, process_image); // Adjust the number of workers as needed
   manager.addStage(&farm);
+  manager.addStage(&farm2);
 
   i = 0;
   ThreadSafeQueue<Task> inputQueue;
@@ -194,6 +192,8 @@ int main(int argc, char * argv[]) {
   }
 
   double end = get_current_time();
+
+  cout << i << endl;
   
   cout << "Runtime is " << end - beginning << endl;
 

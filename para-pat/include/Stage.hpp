@@ -39,7 +39,8 @@ public:
     size_t id = 0;
     //thread-safety implementation of queues (using pthread mutex)
     ThreadSafeQueue<Task>* inputQueue; 
-    ThreadSafeQueue<Task>* outputQueue;
+    // ThreadSafeQueue<Task>* outputQueue;
+    std::vector<ThreadSafeQueue<Task>*> outputQueues;
 
     pthread_t thread;
 
@@ -50,48 +51,59 @@ public:
     Worker() : stopRequested(false) {
         inputQueue = new ThreadSafeQueue<Task>;
         //initiate input and output queues
-        outputQueue = new ThreadSafeQueue<Task>;
+        // outputQueue = new ThreadSafeQueue<Task>;
     }
 
     ~Worker() {
         //de allocate the input and output queues
         delete inputQueue;
-        delete outputQueue;
+        // delete outputQueue;
     }
 
     void run() {
+        size_t nextWorkerIndex = 0;
         while (!stopRequested) {
             Task task;
-            if (inputQueue->dequeue(task)) { //maybe implementing blocking until task is available?
-                if (task.isEOS) { // Check for End-Of-Stream task (end of batch)
-                    outputQueue->enqueue(task); //enqueues the EOS task for the next stage
-                    continue; //continue to process next batch
+            if (inputQueue->dequeue(task)) {
+                if (task.isEOS) {
+                    // Enqueue the EOS task to all workers in the next stage
+                    for (ThreadSafeQueue<Task>* outputQueue : outputQueues) {
+                        outputQueue->enqueue(task);
+                    }
+                    continue;
                 }
 
                 if (task.isShutdown) {
-                    stopRequested = true; //stops thread loop
-                    outputQueue->enqueue(task); //enqueues shutdown task for next stages
+                    stopRequested = true;
+                    // Enqueue the shutdown task to all workers in the next stage
+                    for (ThreadSafeQueue<Task>* outputQueue : outputQueues) {
+                        outputQueue->enqueue(task);
+                    }
                     break;
                 }
 
-                if(task.isValid) {
+                if (task.isValid) {
                     Task result;
                     void* output = workerFunction(task.data);
                     result.data = output;
-                    outputQueue->enqueue(result);
+                    
+                    // Enqueue the result task to the next worker in round-robin fashion
+                    outputQueues[nextWorkerIndex]->enqueue(result);
+                    nextWorkerIndex = (nextWorkerIndex + 1) % outputQueues.size();
                 }
             } else {
                 sched_yield(); // Yield if no task was fetched, to reduce busy waiting
             }
-
         }
 
-        //  // Propagate the shutdown task to the next stage
+    // Propagate the shutdown task to the next stage
         while (!inputQueue->empty()) {
             Task task;
             if (inputQueue->dequeue(task)) {
                 if (task.isShutdown) {
-                    outputQueue->enqueue(task);
+                    for (ThreadSafeQueue<Task>* outputQueue : outputQueues) {
+                        outputQueue->enqueue(task);
+                    }
                     break;
                 }
             }
@@ -116,6 +128,15 @@ public:
         Worker* worker = static_cast<Worker*>(arg);
         worker->run(); 
         return worker;
+    }
+
+    void connectWorkers(const std::vector<Worker*>& nextStageWorkers) {
+        for (Worker* worker : workers) {
+            worker->outputQueues.clear();
+            for (Worker* nextWorker : nextStageWorkers) {
+                worker->outputQueues.push_back(nextWorker->inputQueue);
+            }
+        }
     }
 
 

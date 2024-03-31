@@ -6,11 +6,35 @@ void Pipeline::addStage(Stage<Task>* stage) {
     stages.push_back(stage);
 }
 
+void Pipeline::connectStages() {
+
+    if(stages.size() > 1){
+        for (size_t i = 0; i < stages.size() - 1; ++i) {
+            Stage<Task>* currentStage = stages[i];
+            Stage<Task>* nextStage = stages[i + 1];
+            currentStage->connectWorkers(nextStage->getWorkers());
+        }
+    }
+
+    //initialise queues for final stage 
+    Stage<Task>* finalStage = stages.back();
+    std::vector<Worker*> finalStageWorkers = finalStage->getWorkers();
+
+    for (Worker* worker : finalStageWorkers) {
+        ThreadSafeQueue<Task>* outputQueue = new ThreadSafeQueue<Task>();
+        worker->outputQueues.push_back(outputQueue);
+    }
+
+}
+
 
 ThreadSafeQueue<Result> Pipeline::execute(ThreadSafeQueue<Task>& inputQueue) {
-    size_t totalTasks = inputQueue.size();
-    //round-robin the tasks evenly in the first stage
+    // Connect the stages
+    connectStages();
+
+    // Start the pipeline execution
     std::vector<Worker*> firstStageWorkers = stages[0]->getWorkers();
+    size_t totalTasks = inputQueue.size();
     size_t currentWorker = 0;
     while (!inputQueue.empty()) {
         Task task;
@@ -20,30 +44,26 @@ ThreadSafeQueue<Result> Pipeline::execute(ThreadSafeQueue<Task>& inputQueue) {
         }
     }
 
-    // also enqueue eosTask tasks for all workers in the first stage
+    // Enqueue EOS tasks for all workers in the first stage
     for (Worker* worker : firstStageWorkers) {
         worker->inputQueue->enqueue(Task(nullptr, true));
     }
 
-    
+    // Collect the results from the last stage
     ThreadSafeQueue<Result> output;
-    std::vector<Worker*> finalStageWorkers = stages.back()->getWorkers();
-    size_t totalWorkers = finalStageWorkers.size();
-
-
-    //we wait for the EOS task to be processed by all workers in the final stage
+    std::vector<Worker*> lastStageWorkers = stages.back()->getWorkers();
     size_t resultCount = 0;
-    while (resultCount < totalTasks) { //only when all workers have received an EOS, can we leave the loop
-        for (Worker* worker : finalStageWorkers) {
+    while (resultCount < totalTasks) {
+        for (Worker* worker : lastStageWorkers) {
             Task task;
-            while (worker->outputQueue->dequeue(task)) {
-                if (task.isEOS) {
-                    continue;
-                } else if (!task.isShutdown) { //if this task ins't an eos task or shutdown task
-                    Result result;
-                    result.data = task.data;
-                    output.enqueue(result);
-                    resultCount++;
+            for (ThreadSafeQueue<Task>* outputQueue : worker->outputQueues) {
+                while (outputQueue->dequeue(task)) {
+                    if (!task.isEOS && !task.isShutdown) {
+                        Result result;
+                        result.data = task.data;
+                        output.enqueue(result);
+                        resultCount++;
+                    }
                 }
             }
         }
@@ -64,16 +84,16 @@ Pipeline::~Pipeline() {
 }
 
 void Pipeline::test() {
-    for (auto* stage : stages) {
-        std::vector<Worker*> stageWorkers = stage->getWorkers();
-        for (Worker* worker : stageWorkers) {
-            if(worker->outputQueue->size() > 0) {
-                std::cout << "whaat" << std::endl;
-            }
-            delete worker;
-        }
-        // delete stage; //free each stage 
-    }
+    // for (auto* stage : stages) {
+    //     std::vector<Worker*> stageWorkers = stage->getWorkers();
+    //     for (Worker* worker : stageWorkers) {
+    //         if(worker->outputQueue->size() > 0) {
+    //             // std::cout << "whaat" << std::endl;
+    //         }
+    //         delete worker;
+    //     }
+    //     // delete stage; //free each stage 
+    // }
 }
 
 void Pipeline::terminate() {

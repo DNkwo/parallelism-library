@@ -19,8 +19,6 @@ public:
 
     void addStage(Stage<Task>* stage);
 
-    // void addTask(Task& task);
-
     void setupInterrelations();
 
     ThreadSafeQueue<Result> execute(ThreadSafeQueue<Task>& inputQueue);

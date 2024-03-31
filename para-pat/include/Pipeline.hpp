@@ -15,6 +15,7 @@ public:
 
     ThreadSafeQueue<Result> execute(ThreadSafeQueue<Task>& inputQueue) ;
 
+    void connectStages();
     //destructor (for clean up)
     ~Pipeline();
 
