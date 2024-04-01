@@ -61,6 +61,9 @@
         "iomanip": "cpp",
         "span": "cpp",
         "variant": "cpp",
-        "cstdarg": "cpp"
+        "cstdarg": "cpp",
+        "time.h": "c",
+        "stdio.h": "c",
+        "string.h": "c"
     }
 }

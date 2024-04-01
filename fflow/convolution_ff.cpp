@@ -1,6 +1,8 @@
 // compile with
-// g++ convolution.cpp -lpng
+// g++ convolution_ff.cpp -o convolution_ff -lpng -pthread -I/path/to/fastflow
 
+#include <ff/farm.hpp>
+#include <ff/pipeline.hpp>
 #include <png.h>
 #include <iostream>
 #include <sstream>
@@ -14,18 +16,9 @@
 #include <fstream>
 #include <sys/time.h>
 
-
-int dim, nr_cpu_w, nr_gpu_w;
-const int mask_dim=8;
-
-unsigned short **images;
-unsigned short **masks;
-unsigned short **out_images;
-int nr_images=20;
-
-typedef std::string* string_p;
-
 using namespace std;
+using namespace ff;
+
 
 double get_current_time()
 {
@@ -133,44 +126,70 @@ unsigned short * process_image(task_t task) {
     return out_image;
 }
 
-int i=0;
-
-int main(int argc, char * argv[]) {
-
-  string_p image_name_p;
-  unsigned int nr_images, pattern, do_chunking, min_chunk_size;
-  int i=0;
-  // if (argc<3)
-  //  std::cerr << "use: " << argv[0] << " <imageSize> <nrImages> [<chunking>]\n";
-  dim = 1024 ; // atoi(argv[1]);
-  nr_images = 20 ; // atoi(argv[2]);
-  
-  images = new unsigned short *[nr_images];
-  masks = new unsigned short *[nr_images];
-  out_images = new unsigned short *[nr_images];
-  unsigned short * mask = new unsigned short ;
-  int N[nr_images];
-
-  for (int i=0; i<nr_images; i++) {
-	  N[i] = i;
-	 out_images[i] = new unsigned short[dim*dim];
+struct ReadImageTask: ff_node_t<string_p, task_t> {
+  task_t* svc(string_p* image_name_p) {
+    task_t task = read_image_and_mask(*image_name_p);
+    return new task_t(task);
   }
+};
+
+struct ProcessImageTask: ff_node_t<task_t, unsigned short*> {
+  unsigned short* svc(task_t* task) {
+    unsigned short* out_image = process_image(*task);
+    delete task;
+    return out_image;
+  }
+};
+
+struct WriteImageTask: ff_node_t<unsigned short*, void> {
+  void svc(unsigned short* image) {
+    // You can add code here to write the processed image to a file if needed
+    delete[] image;
+  }
+};
+
+struct Emitter: ff_node_t<int> {
+  Emitter(int nr_images) : nr_images(nr_images) {}
+
+  int svc(int) {
+    for (int i = 0; i < nr_images; i++) {
+      string_p image_name_p = get_image_name(i);
+      ff_send_out(image_name_p);
+    }
+    return EOS;
+  }
+
+  int nr_images;
+};
+
+int main(int argc, char* argv[]) {
+  // ... (keep the existing code for parsing command-line arguments and initializing variables)
 
   double beginning = get_current_time();
 
-
-  for (int i = 0; i < nr_images; i++) {
-	  image_name_p = get_image_name(N[i]);
-	  task_t task = read_image_and_mask(image_name_p);
-	  out_images[i] = process_image(task);
+  ff_Farm<> read_farm(true, 2);
+  vector<ff_node*> read_workers;
+  for (int i = 0; i < 2; ++i) {
+    read_workers.push_back(new ReadImageTask());
   }
+  read_farm.add_workers(read_workers);
+
+  ff_Farm<> process_farm(true, 6);
+  vector<ff_node*> process_workers;
+  for (int i = 0; i < 6; ++i) {
+    process_workers.push_back(new ProcessImageTask());
+  }
+  process_farm.add_workers(process_workers);
+
+  Emitter emitter(nr_images);
+  WriteImageTask writer;
+
+  ff_Pipe<> pipe(emitter, read_farm, process_farm, writer);
+  pipe.run_and_wait_end();
+
   double end = get_current_time();
-  
+
   cout << "Runtime is " << end - beginning << endl;
 
-  return 0;
+  // ... (keep the existing code for cleanup and returning)
 }
-
-
-
-

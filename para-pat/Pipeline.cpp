@@ -74,13 +74,13 @@ ThreadSafeQueue<Result> Pipeline::execute(ThreadSafeQueue<Task>& inputQueue) {
 }
 
 Pipeline::~Pipeline() {
-    // for (auto* stage : stages) {
-    //     std::vector<Worker*> stageWorkers = stage->getWorkers();
-    //     for (Worker* worker : stageWorkers) {
-    //         delete worker;
-    //     }
-    //     delete stage; //free each stage 
-    // }
+    for (auto* stage : stages) {
+        std::vector<Worker*> stageWorkers = stage->getWorkers();
+        for (Worker* worker : stageWorkers) {
+            delete worker;
+        }
+        // delete stage; //free each stage 
+    }
 }
 
 void Pipeline::test() {

@@ -1,7 +1,6 @@
 #include "para-pat/include/Farm.hpp"
 #include "para-pat/include/Pipeline.hpp"
 #include "para-pat/include/Pipe.hpp"
-#include "para-pat/include/StageManager.hpp"
 
 
 int fib(int n)
@@ -51,7 +50,7 @@ int main() {
 
     ThreadSafeQueue<Task> inputQueue;
     for (int i = 0; i < 2; i++) {
-        int* taskData = new int(5);
+        int* taskData = new int(4); //any arbritary value
         inputQueue.enqueue(Task(taskData));
     }
 

@@ -4,7 +4,6 @@
 #include "para-pat/include/Farm.hpp"
 #include "para-pat/include/Pipeline.hpp"
 #include "para-pat/include/Pipe.hpp"
-#include "para-pat/include/StageManager.hpp"
 
 #include <png.h>
 #include <iostream>
@@ -163,39 +162,56 @@ int main(int argc, char * argv[]) {
 	 out_images[i] = new unsigned short[dim*dim];
   }
 
-  double beginning = get_current_time();
 
-  StageManager manager;
-  Farm farm(2, read_image_and_mask);
-  Farm farm2(6, process_image); // Adjust the number of workers as needed
-  manager.addStage(&farm);
-  manager.addStage(&farm2);
+  Pipeline pipeline;
 
-  i = 0;
-  ThreadSafeQueue<Task> inputQueue;
-  for (i = 0; i < nr_images; i++) {
-    string_p image_name_p = get_image_name(N[i]);
-    Task task(image_name_p);
-    inputQueue.enqueue(task);
-  }
+  // Pipe pipe1(read_image_and_mask);
+  Pipe pipe2(read_image_and_mask);
 
-  ThreadSafeQueue<Result> outputQueue = manager.execute(inputQueue);
-  manager.terminate();
+  Farm farm1(2, process_image);
+  // Farm farm2(6, process_image); // Adjust the number of workers as needed
+
+  pipeline.addStage(&pipe2);
+  pipeline.addStage(&farm1);
+
 
   i = 0;
-  while (!outputQueue.empty()) {
-    Result result;
-    if (outputQueue.dequeue(result)) {
-      out_images[i] = static_cast<unsigned short*>(result.data);
-      i++;
+
+  const int num_runs = 3;
+  double total_time = 0.0;
+
+    for (int run = 0; run < num_runs; ++run) {
+      
+        ThreadSafeQueue<Task> inputQueue;
+        for (i = 0; i < nr_images; i++) {
+          string_p image_name_p = get_image_name(N[i]);
+          Task task(image_name_p);
+          inputQueue.enqueue(task);
+        }
+
+        double beginning = get_current_time();
+        ThreadSafeQueue<Result> outputQueue = pipeline.execute(inputQueue);
+        double end = get_current_time();
+
+        double run_time = (end - beginning);
+
+        std::cout << "Time taken for run: " << run << " is " <<  run_time << " seconds" << std::endl;
+
+        total_time += run_time;
+
+        // Process the results (if needed)
+        i = 0;
+        while (!outputQueue.empty()) {
+            Result result;
+            if (outputQueue.dequeue(result)) {
+                out_images[i] = static_cast<unsigned short*>(result.data);
+                i++;
+            }
+        }
     }
-  }
 
-  double end = get_current_time();
-
-  cout << i << endl;
-  
-  cout << "Runtime is " << end - beginning << endl;
+    double average_runtime = total_time / num_runs;
+    std::cout << "Average Runtime: " << average_runtime << " seconds" << std::endl;
 
   return 0;
 }

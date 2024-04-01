@@ -56,7 +56,7 @@ public:
 
     ~Worker() {
         //de allocate the input and output queues
-        delete inputQueue;
+        // delete inputQueue;
         // delete outputQueue;
     }
 
