@@ -51,35 +51,39 @@ double get_current_time()
 }
 
 int main() {
-    Pipeline pipeline;
 
-    // Pipe pipe1(payload2);
-    // Pipe pipe2(payload2);
-
-    // Pipe pipe2(payload2);
-    Farm farm1(8, payload1);
-    Farm farm2(8, payload2);
-
-    // pipeline.addStage(&pipe1);
-    pipeline.addStage(&farm1);
-    // pipeline.addStage(&pipe2);
+    int numtasks = 20; //number of tasks
 
 
-    // pipeline.addStage(&farm1);
-    pipeline.addStage(&farm2);
-
+    //generating tasks and putting them into input queue
     ThreadSafeQueue<Task> inputQueue;
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < numtasks; i++) {
         int* taskData = new int(900090000);
         inputQueue.enqueue(Task(taskData));
     }
 
+    //create pipeline
+    Pipeline pipeline;
+
+    //creating stages
+    Pipe pipe(payload1);
+    Farm farm(8, payload2);
+
+    //adding stages to pipeline
+    pipeline.addStage(&pipe);
+    pipeline.addStage(&farm);
+
+    //measuring time
     double beginning = get_current_time();
 
+
+    //executing pipeline
     ThreadSafeQueue<Result> output = pipeline.execute(inputQueue);
 
     double end = get_current_time();
 
+
+    //processing results (conversion from void* back to original data point)
     while (!output.empty()) {
         Result result;
         if (output.dequeue(result)) {

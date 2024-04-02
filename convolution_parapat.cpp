@@ -1,8 +1,10 @@
 // compile with
-// g++ convolution_ff.cpp -o convolution_ff -lpng -pthread -I/path/to/fastflow
+// g++ convolution.cpp -lpng
 
-#include <ff/farm.hpp>
-#include <ff/pipeline.hpp>
+#include "para-pat/include/Farm.hpp"
+#include "para-pat/include/Pipeline.hpp"
+#include "para-pat/include/Pipe.hpp"
+
 #include <png.h>
 #include <iostream>
 #include <sstream>
@@ -16,9 +18,18 @@
 #include <fstream>
 #include <sys/time.h>
 
-using namespace std;
-using namespace ff;
 
+int dim, nr_cpu_w, nr_gpu_w;
+const int mask_dim=8;
+
+unsigned short **images;
+unsigned short **masks;
+unsigned short **out_images;
+int nr_images=100;
+
+typedef std::string* string_p;
+
+using namespace std;
 
 double get_current_time()
 {
@@ -79,25 +90,27 @@ typedef struct {
   unsigned short* mask;
 } task_t;
 
-task_t read_image_and_mask(string_p image_name_p) {
-  task_t task;
-  task.image = read_image(image_name_p->c_str(), dim);
-  task.mask = new unsigned short[mask_dim*mask_dim]();
+void* read_image_and_mask(void* arg) {
+  string_p image_name_p = static_cast<string_p>(arg);
+  task_t* task = new task_t;
+  task->image = read_image(image_name_p->c_str(), dim);
+  task->mask = new unsigned short[mask_dim*mask_dim]();
   float val = 1.0f/(mask_dim * 2.0f - 1.0f);
   unsigned short y = mask_dim/2;
   for(int j=0; j < mask_dim; j++) 
-    task.mask[y*mask_dim + j] = val;
+    task->mask[y*mask_dim + j] = val;
   unsigned short x = mask_dim/2;
   for(int j=0; j < mask_dim; j++) 
-    task.mask[j*mask_dim + x] = val;
+    task->mask[j*mask_dim + x] = val;
 
   return task;
 
 }
 
-unsigned short * process_image(task_t task) {
-  unsigned short *in_image = task.image;
-  unsigned short *mask = task.mask;
+void* process_image(void* arg) {
+  task_t* task = static_cast<task_t*>(arg); //extract arguments from struct
+  unsigned short *in_image = task->image;
+  unsigned short *mask = task->mask;
 	unsigned short * out_image = new unsigned short[dim*dim];
   int vstep = mask_dim/2;
   int hstep = mask_dim/2;
@@ -126,70 +139,88 @@ unsigned short * process_image(task_t task) {
     return out_image;
 }
 
-struct ReadImageTask: ff_node_t<string_p, task_t> {
-  task_t* svc(string_p* image_name_p) {
-    task_t task = read_image_and_mask(*image_name_p);
-    return new task_t(task);
+int i=0;
+
+int main(int argc, char * argv[]) {
+
+  //original stuff used in the original file
+  string_p image_name_p;
+  unsigned int nr_images, pattern, do_chunking, min_chunk_size;
+  int i=0;
+  // if (argc<3)
+  //  std::cerr << "use: " << argv[0] << " <imageSize> <nrImages> [<chunking>]\n";
+  dim = 1024 ; // atoi(argv[1]);
+  nr_images = 50 ; // atoi(argv[2]);
+  
+  images = new unsigned short *[nr_images];
+  masks = new unsigned short *[nr_images];
+  out_images = new unsigned short *[nr_images];
+  unsigned short * mask = new unsigned short ;
+  int N[nr_images];
+
+  for (int i=0; i<nr_images; i++) {
+	  N[i] = i;
+	 out_images[i] = new unsigned short[dim*dim];
   }
-};
 
-struct ProcessImageTask: ff_node_t<task_t, unsigned short*> {
-  unsigned short* svc(task_t* task) {
-    unsigned short* out_image = process_image(*task);
-    delete task;
-    return out_image;
-  }
-};
+  ///PARA-PAT STUFF------------------------------------/
 
-struct WriteImageTask: ff_node_t<unsigned short*, void> {
-  void svc(unsigned short* image) {
-    // You can add code here to write the processed image to a file if needed
-    delete[] image;
-  }
-};
+  //create pipeline
+  Pipeline pipeline;
 
-struct Emitter: ff_node_t<int> {
-  Emitter(int nr_images) : nr_images(nr_images) {}
+  //creating stages
+  Pipe pipe2(read_image_and_mask);
+  Farm farm1(2, process_image);
 
-  int svc(int) {
-    for (int i = 0; i < nr_images; i++) {
-      string_p image_name_p = get_image_name(i);
-      ff_send_out(image_name_p);
+  //adding stages
+  pipeline.addStage(&pipe2);
+  pipeline.addStage(&farm1);
+
+
+  i = 0;
+
+
+  //code for testing, (runs 5 times and calculates the average)
+  //refer to main.cpp or fibonacci_parapat.cpp for a demonstration of only the library. It still works here, but I just did this for the report.
+  const int num_runs = 5;
+  double total_time = 0.0;
+
+    for (int run = 0; run < num_runs; ++run) {
+      
+        ThreadSafeQueue<Task> inputQueue;
+        for (i = 0; i < nr_images; i++) {
+          string_p image_name_p = get_image_name(N[i]);
+          Task task(image_name_p);
+          inputQueue.enqueue(task);
+        }
+
+        double beginning = get_current_time();
+        ThreadSafeQueue<Result> outputQueue = pipeline.execute(inputQueue);
+        double end = get_current_time();
+
+        double run_time = (end - beginning);
+
+        std::cout << "Time taken for run: " << run << " is " <<  run_time << " seconds" << std::endl;
+
+        total_time += run_time;
+
+        // Process the results (if needed)
+        i = 0;
+        while (!outputQueue.empty()) {
+            Result result;
+            if (outputQueue.dequeue(result)) {
+                out_images[i] = static_cast<unsigned short*>(result.data);
+                i++;
+            }
+        }
     }
-    return EOS;
-  }
 
-  int nr_images;
-};
+    double average_runtime = total_time / num_runs;
+    std::cout << "Average Runtime: " << average_runtime << " seconds" << std::endl;
 
-int main(int argc, char* argv[]) {
-  // ... (keep the existing code for parsing command-line arguments and initializing variables)
-
-  double beginning = get_current_time();
-
-  ff_Farm<> read_farm(true, 2);
-  vector<ff_node*> read_workers;
-  for (int i = 0; i < 2; ++i) {
-    read_workers.push_back(new ReadImageTask());
-  }
-  read_farm.add_workers(read_workers);
-
-  ff_Farm<> process_farm(true, 6);
-  vector<ff_node*> process_workers;
-  for (int i = 0; i < 6; ++i) {
-    process_workers.push_back(new ProcessImageTask());
-  }
-  process_farm.add_workers(process_workers);
-
-  Emitter emitter(nr_images);
-  WriteImageTask writer;
-
-  ff_Pipe<> pipe(emitter, read_farm, process_farm, writer);
-  pipe.run_and_wait_end();
-
-  double end = get_current_time();
-
-  cout << "Runtime is " << end - beginning << endl;
-
-  // ... (keep the existing code for cleanup and returning)
+  return 0;
 }
+
+
+
+

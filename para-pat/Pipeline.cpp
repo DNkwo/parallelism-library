@@ -1,11 +1,11 @@
 #include "include/Pipeline.hpp"
 #include <chrono>
-#include <Windows.h>
 
 void Pipeline::addStage(Stage<Task>* stage) {
     stages.push_back(stage);
 }
 
+//connects stages by using the connectWorkers() function
 void Pipeline::connectStages() {
 
     if(stages.size() > 1){
@@ -53,10 +53,10 @@ ThreadSafeQueue<Result> Pipeline::execute(ThreadSafeQueue<Task>& inputQueue) {
     ThreadSafeQueue<Result> output;
     std::vector<Worker*> lastStageWorkers = stages.back()->getWorkers();
     size_t resultCount = 0;
-    while (resultCount < totalTasks) {
+    while (resultCount < totalTasks) { //we continue to loop until we have processed all tasks
         for (Worker* worker : lastStageWorkers) {
             Task task;
-            for (ThreadSafeQueue<Task>* outputQueue : worker->outputQueues) {
+            for (ThreadSafeQueue<Task>* outputQueue : worker->outputQueues) { //loops through output queues dequeing tasks
                 while (outputQueue->dequeue(task)) {
                     if (!task.isEOS && !task.isShutdown) {
                         Result result;
@@ -67,34 +67,12 @@ ThreadSafeQueue<Result> Pipeline::execute(ThreadSafeQueue<Task>& inputQueue) {
                 }
             }
         }
-        sched_yield();
+        sched_yield(); //yield to stop busy waiting
     }
 
     return output;
 }
 
-Pipeline::~Pipeline() {
-    for (auto* stage : stages) {
-        std::vector<Worker*> stageWorkers = stage->getWorkers();
-        for (Worker* worker : stageWorkers) {
-            delete worker;
-        }
-        // delete stage; //free each stage 
-    }
-}
-
-void Pipeline::test() {
-    // for (auto* stage : stages) {
-    //     std::vector<Worker*> stageWorkers = stage->getWorkers();
-    //     for (Worker* worker : stageWorkers) {
-    //         if(worker->outputQueue->size() > 0) {
-    //             // std::cout << "whaat" << std::endl;
-    //         }
-    //         delete worker;
-    //     }
-    //     // delete stage; //free each stage 
-    // }
-}
 
 void Pipeline::terminate() {
     //enqueue shutdown tasks for all workers in the first stage

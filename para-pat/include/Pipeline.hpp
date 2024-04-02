@@ -5,26 +5,21 @@
 #include <vector>
 #include <queue>
 
-typedef void* (*WorkerFunction)(void*);
+typedef void* (*WorkerFunction)(void*); //we use a type defintion for worker function pointer
 
 class Pipeline {
 public:
-    std::vector<Stage<Task>*> stages; //vector of pointers to the stages
+    std::vector<Stage<Task>*> stages; //vector of pointers to the stages in the pipeline
 
-    void addStage(Stage<Task>* stage);
+    void addStage(Stage<Task>* stage); //adds a stage to the pipeline
 
-    ThreadSafeQueue<Result> execute(ThreadSafeQueue<Task>& inputQueue) ;
+    ThreadSafeQueue<Result> execute(ThreadSafeQueue<Task>& inputQueue) ; //excutes the pipeline with in an input queue
 
-    void connectStages();
-    //destructor (for clean up)
-    ~Pipeline();
+    void connectStages(); //connects the stages in the pipeline
 
-    void terminate();
+    void terminate(); //terminates the pipeline
 
-    void test();
-
-
-    std::vector<Stage<Task>*> getStages();
+    std::vector<Stage<Task>*> getStages(); //function to ge the stages in the pipeline
 
 };
 

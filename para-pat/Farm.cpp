@@ -17,6 +17,7 @@ Farm::Farm(size_t numOfWorkers, WorkerFunction workerFunction) : Stage<Task>(wor
 }
 
 Farm::~Farm(){
+    //commented out, done elsewhere
     // for (size_t i = 0; i < numOfWorkers; ++i) {
     //     pthread_join(workers[i]->thread, nullptr);
     // }

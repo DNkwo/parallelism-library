@@ -4,10 +4,11 @@
 #include "Stage.hpp"
 
 
+//child of Stage 
 class Pipe : public Stage<Task> {
 
 public:
-    Pipe(WorkerFunction workerFunction);
+    Pipe(WorkerFunction workerFunction); //takes a worker function as parameter
 
     ~Pipe();
     

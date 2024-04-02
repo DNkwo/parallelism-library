@@ -10,5 +10,6 @@ Pipe::Pipe(WorkerFunction workerFunction) : Stage<Task>(workerFunction){
 }
 
 Pipe::~Pipe(){
+    //commented out, done elsewhere
     // pthread_join(workers[0]->thread, nullptr);
 }
